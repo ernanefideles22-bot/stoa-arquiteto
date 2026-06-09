@@ -7,7 +7,7 @@ import os
 import anthropic
 
 client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-MODEL = "claude-sonnet-4-5"
+MODEL = "claude-haiku-4-5-20251001"
 
 SYSTEM = (
     "Você é um especialista em engenharia civil, arquitetura, urbanismo e desenvolvimento imobiliário no Brasil. "
@@ -19,7 +19,7 @@ async def _ask(prompt: str, temperature: float = 0.3) -> dict:
     """Chama o Claude e parseia JSON da resposta."""
     resp = await client.messages.create(
         model=MODEL,
-        max_tokens=4096,
+        max_tokens=2048,
         temperature=temperature,
         system=SYSTEM,
         messages=[{"role": "user", "content": prompt}],
