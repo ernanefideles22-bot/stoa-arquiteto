@@ -1,7 +1,8 @@
 """
-STOA Civil — Plataforma de Desenvolvimento Imobiliário Assistido por IA
+STOA Civil â Plataforma de Desenvolvimento ImobiliÃ¡rio Assistido por IA
 """
 import os
+import logging
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,12 +15,15 @@ load_dotenv()
 from .models.database import create_tables
 from .routers import projects, terrain, implantation, financial
 
-# Criar tabelas na inicialização
-create_tables()
+# Criar tabelas na inicializaÃ§Ã£o (tolerante a falhas de conexÃ£o)
+try:
+    create_tables()
+except Exception as _e:
+    logging.warning("create_tables falhou no startup: %s", _e)
 
 app = FastAPI(
     title="STOA Civil",
-    description="Plataforma de Desenvolvimento Imobiliário Assistido por IA",
+    description="Plataforma de Desenvolvimento ImobiliÃ¡rio Assistido por IA",
     version="1.0.0",
 )
 
