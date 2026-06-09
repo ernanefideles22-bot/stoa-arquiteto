@@ -12,7 +12,7 @@ if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     import re, ssl
-    # Usa pg8000 (pure Python) como driver â evita problemas com psycopg2 no serverless
+    # Usa pg8000 (pure Python) como driver — evita problemas com psycopg2 no serverless
     url = DATABASE_URL
     for prefix in ("postgresql://", "postgres://"):
         if url.startswith(prefix):
@@ -30,13 +30,12 @@ else:
         ctx.verify_mode = ssl.CERT_NONE
         connect_args["ssl_context"] = ctx
 
+    from sqlalchemy.pool import NullPool
+    connect_args["timeout"] = 8  # pg8000 connection timeout em segundos
     engine = create_engine(
         url,
         connect_args=connect_args,
-        pool_pre_ping=True,
-        pool_size=5,
-        max_overflow=10,
-        pool_recycle=300,
+        poolclass=NullPool,  # NullPool essencial para serverless (sem pool persistente)
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
