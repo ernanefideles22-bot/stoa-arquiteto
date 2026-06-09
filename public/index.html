@@ -782,13 +782,13 @@ function renderTopographyResults(data) {
     ${topo.img_topografia ? `
     <div class="card">
       <div class="card-title"><span>🗺️</span> Análise Topográfica</div>
-      <img class="img-result" src="data:image/png;base64,${topo.img_topografia}" alt="Topografia">
+      <img class="img-result" src="${topo.img_topografia}" alt="Topografia">
     </div>` : ''}
 
     ${topo.img_zonas ? `
     <div class="card">
       <div class="card-title"><span>📊</span> Distribuição de Declividade</div>
-      <img class="img-result" src="data:image/png;base64,${topo.img_zonas}" alt="Declividade">
+      <img class="img-result" src="${topo.img_zonas}" alt="Declividade">
     </div>` : ''}
 
     <div class="ia-card">
