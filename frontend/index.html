@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STOA Civil — Desenvolvimento Imobiliário com IA</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --bg:#0d0f1a;--panel:#151828;--border:#1e2340;--accent:#4fc3f7;
+  --accent2:#7c4dff;--success:#4caf50;--warn:#ff9800;--danger:#f44336;
+  --text:#e8eaf6;--text2:#9fa8da;--radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── HEADER ── */
+header{background:var(--panel);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:.5px;}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.header-actions{display:flex;gap:10px;align-items:center;}
+.btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.2s;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{filter:brightness(1.15);}
+.btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:var(--danger);color:#fff;}
+
+/* ── LAYOUT ── */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.sidebar-section{padding:16px;}
+.sidebar-section h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:10px;}
+.project-list{display:flex;flex-direction:column;gap:6px;}
+.project-item{padding:10px 12px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:.2s;}
+.project-item:hover{border-color:var(--accent);background:rgba(79,195,247,.06);}
+.project-item.active{border-color:var(--accent);background:rgba(79,195,247,.1);}
+.project-name{font-size:13px;font-weight:600;}
+.project-meta{font-size:11px;color:var(--text2);margin-top:2px;}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;}
+.status-em_estudo{background:rgba(79,195,247,.2);color:var(--accent);}
+.status-execucao{background:rgba(76,175,80,.2);color:var(--success);}
+
+/* ── CONTENT ── */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── TABS ── */
+.tabs{background:var(--panel);border-bottom:1px solid var(--border);display:flex;padding:0 20px;flex-shrink:0;}
+.tab{padding:14px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:.2s;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-badge{background:var(--accent);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;}
+
+/* ── PANELS ── */
+.panels{flex:1;overflow:hidden;position:relative;}
+.panel{position:absolute;inset:0;overflow-y:auto;padding:24px;display:none;}
+.panel.active{display:block;}
+
+/* ── CARDS ── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+.card-title{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:var(--text);}
+.card-title span{font-size:16px;}
+
+/* ── FORM ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-grid.cols3{grid-template-columns:1fr 1fr 1fr;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group.full{grid-column:1/-1;}
+label{font-size:12px;color:var(--text2);font-weight:600;}
+input,select,textarea{background:#0d0f1a;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 12px;font-size:13px;width:100%;transition:.2s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+textarea{resize:vertical;min-height:72px;}
+.checkbox-group{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.checkbox-item{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;}
+.checkbox-item input{width:auto;}
+
+/* ── MAP ── */
+#map{height:380px;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;}
+
+/* ── TOPOGRAFIA ── */
+.topo-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.metric-card{background:#0d0f1a;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;}
+.metric-value{font-size:22px;font-weight:700;color:var(--accent);}
+.metric-label{font-size:11px;color:var(--text2);margin-top:4px;}
+.img-result{width:100%;border-radius:8px;border:1px solid var(--border);}
+
+/* ── IA ANALYSIS ── */
+.ia-card{background:linear-gradient(135deg,rgba(79,195,247,.08),rgba(124,77,255,.08));border:1px solid rgba(79,195,247,.2);border-radius:var(--radius);padding:20px;}
+.ia-score{font-size:40px;font-weight:800;color:var(--accent);}
+.ia-label{font-size:12px;color:var(--text2);}
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.tag{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.tag-good{background:rgba(76,175,80,.2);color:var(--success);}
+.tag-warn{background:rgba(255,152,0,.2);color:var(--warn);}
+.tag-bad{background:rgba(244,67,54,.2);color:var(--danger);}
+
+/* ── ALTERNATIVAS ── */
+.alternatives-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.alt-card{background:var(--panel);border:2px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:.3s;}
+.alt-card:hover{border-color:var(--accent);}
+.alt-card.selected{border-color:var(--accent);background:rgba(79,195,247,.06);}
+.alt-name{font-size:15px;font-weight:700;margin-bottom:8px;}
+.alt-score{font-size:28px;font-weight:800;color:var(--accent);}
+.alt-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.alt-stat{font-size:11px;color:var(--text2);}
+.alt-stat strong{color:var(--text);display:block;font-size:13px;}
+
+/* ── FINANCEIRO ── */
+.fin-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi{background:#0d0f1a;border:1px solid var(--border);border-radius:8px;padding:16px;}
+.kpi-value{font-size:20px;font-weight:700;}
+.kpi-label{font-size:11px;color:var(--text2);margin-top:4px;}
+.kpi-positive{color:var(--success);}
+.kpi-neutral{color:var(--accent);}
+.kpi-warn{color:var(--warn);}
+
+/* ── CANVAS 3D ── */
+#canvas3d{width:100%;height:380px;border-radius:var(--radius);border:1px solid var(--border);display:block;}
+
+/* ── PROGRESS ── */
+.progress-steps{display:flex;gap:0;margin-bottom:20px;}
+.step{flex:1;padding:10px 8px;text-align:center;font-size:11px;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border);position:relative;}
+.step.done{color:var(--success);border-bottom-color:var(--success);}
+.step.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ── LOADING ── */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px;color:var(--text2);}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;display:none;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:480px;max-width:95vw;}
+.modal h2{margin-bottom:20px;font-size:16px;}
+
+/* ── EMPTY STATE ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text2);text-align:center;gap:12px;}
+.empty-icon{font-size:48px;opacity:.4;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏗️</div>
+    STOA Civil
+  </div>
+  <div class="header-actions">
+    <span id="projectTitle" style="color:var(--text2);font-size:13px;">Nenhum projeto selecionado</span>
+    <button class="btn btn-primary" onclick="openNewProjectModal()">+ Novo Projeto</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h3>Projetos</h3>
+      <div class="project-list" id="projectList">
+        <div class="empty-state" style="padding:20px">
+          <div class="empty-icon">📁</div>
+          <small>Nenhum projeto ainda</small>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <!-- TABS -->
+    <nav class="tabs">
+      <div class="tab active" data-tab="overview" onclick="showTab('overview')">📊 Visão Geral</div>
+      <div class="tab" data-tab="terrain" onclick="showTab('terrain')">🌍 Terreno</div>
+      <div class="tab" data-tab="topography" onclick="showTab('topography')">⛰️ Topografia</div>
+      <div class="tab" data-tab="implantation" onclick="showTab('implantation')">🗺️ Implantação</div>
+      <div class="tab" data-tab="financial" onclick="showTab('financial')">💰 Viabilidade</div>
+      <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');init3D()">🎯 3D</div>
+    </nav>
+
+    <!-- PANELS -->
+    <div class="panels">
+
+      <!-- OVERVIEW -->
+      <div class="panel active" id="panel-overview">
+        <div id="overviewContent">
+          <div class="empty-state">
+            <div class="empty-icon">🏗️</div>
+            <h3>STOA Civil</h3>
+            <p>Selecione um projeto ou crie um novo para começar.</p>
+            <button class="btn btn-primary" onclick="openNewProjectModal()">Criar primeiro projeto</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TERRENO -->
+      <div class="panel" id="panel-terrain">
+        <div class="card">
+          <div class="card-title"><span>🌍</span> Cadastro do Terreno</div>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Endereço / Localização</label>
+              <input id="terrainAddress" placeholder="Ex: Estrada Municipal km 12, Resende, RJ" />
+            </div>
+            <div class="form-group">
+              <label>Cidade</label>
+              <input id="terrainCity" placeholder="Resende" />
+            </div>
+            <div class="form-group">
+              <label>Estado</label>
+              <input id="terrainState" placeholder="RJ" />
+            </div>
+            <div class="form-group">
+              <label>Latitude (opcional)</label>
+              <input id="terrainLat" type="number" step="0.000001" placeholder="-22.4697" />
+            </div>
+            <div class="form-group">
+              <label>Longitude (opcional)</label>
+              <input id="terrainLon" type="number" step="0.000001" placeholder="-44.4506" />
+            </div>
+            <div class="form-group">
+              <label>Área (hectares)</label>
+              <input id="terrainArea" type="number" step="0.1" placeholder="100" />
+            </div>
+            <div class="form-group">
+              <label>Tipologia pretendida</label>
+              <select id="terrainTypology">
+                <option value="condominio_loteamento">Condomínio / Loteamento</option>
+                <option value="residencial_unifamiliar">Residencial Unifamiliar</option>
+                <option value="pousada_hotel">Pousada / Hotel</option>
+                <option value="comercial">Comercial</option>
+                <option value="industrial">Industrial</option>
+                <option value="misto">Uso Misto</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Topografia geral</label>
+              <select id="terrainTopo">
+                <option value="plano">Plano</option>
+                <option value="ondulado" selected>Ondulado</option>
+                <option value="acidentado">Acidentado</option>
+                <option value="montanhoso">Montanhoso</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Vegetação</label>
+              <select id="terrainVeg">
+                <option value="nenhuma">Nenhuma</option>
+                <option value="rasteira" selected>Rasteira</option>
+                <option value="arbustiva">Arbustiva</option>
+                <option value="arborea">Arbórea</option>
+                <option value="mata">Mata nativa</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Acesso</label>
+              <select id="terrainAcesso">
+                <option value="via pavimentada" selected>Via pavimentada</option>
+                <option value="via de terra">Via de terra</option>
+                <option value="sem acesso">Sem acesso definido</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label>Infraestrutura disponível</label>
+              <div class="checkbox-group">
+                <label class="checkbox-item"><input type="checkbox" value="agua" class="infra-cb"> Água</label>
+                <label class="checkbox-item"><input type="checkbox" value="esgoto" class="infra-cb"> Esgoto</label>
+                <label class="checkbox-item"><input type="checkbox" value="energia" class="infra-cb"> Energia</label>
+                <label class="checkbox-item"><input type="checkbox" value="pavimentacao" class="infra-cb"> Pavimentação</label>
+                <label class="checkbox-item"><input type="checkbox" value="telefone" class="infra-cb"> Telefone/Internet</label>
+              </div>
+            </div>
+            <div class="form-group full">
+              <label>Zoneamento / Observações</label>
+              <textarea id="terrainNotes" placeholder="Zoneamento municipal, restrições conhecidas, observações..."></textarea>
+            </div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-primary" onclick="analyzeTerrain()" id="btnAnalyzeTerrain">
+              🔍 Analisar Terreno com IA
+            </button>
+          </div>
+        </div>
+
+        <!-- Mapa -->
+        <div class="card">
+          <div class="card-title"><span>🗺️</span> Localização no Mapa</div>
+          <div id="map"></div>
+          <p style="font-size:11px;color:var(--text2);margin-top:8px;">
+            Clique no mapa para definir coordenadas precisas, ou informe o endereço acima.
+          </p>
+        </div>
+      </div>
+
+      <!-- TOPOGRAFIA -->
+      <div class="panel" id="panel-topography">
+        <div id="topoContent">
+          <div class="empty-state">
+            <div class="empty-icon">⛰️</div>
+            <p>Cadastre e analise o terreno primeiro.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMPLANTAÇÃO -->
+      <div class="panel" id="panel-implantation">
+        <div class="card">
+          <div class="card-title"><span>🗺️</span> Gerar Alternativas de Implantação</div>
+          <div class="form-grid cols3">
+            <div class="form-group">
+              <label>Tipologia</label>
+              <select id="implTypology">
+                <option value="condominio_loteamento">Condomínio / Loteamento</option>
+                <option value="condominio_fechado">Condomínio Fechado</option>
+                <option value="loteamento_aberto">Loteamento Aberto</option>
+                <option value="pousada">Pousada</option>
+                <option value="hotel">Hotel</option>
+                <option value="residencial">Residencial</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Nº de Lotes / Unidades desejado</label>
+              <input id="implLotes" type="number" placeholder="50" />
+            </div>
+            <div class="form-group">
+              <label>Área mínima por lote (m²)</label>
+              <input id="implAreaMin" type="number" placeholder="300" />
+            </div>
+            <div class="form-group">
+              <label>Área máxima por lote (m²)</label>
+              <input id="implAreaMax" type="number" placeholder="1000" />
+            </div>
+            <div class="form-group">
+              <label>Padrão</label>
+              <select id="implPadrao">
+                <option value="economico">Econômico</option>
+                <option value="medio" selected>Médio</option>
+                <option value="alto">Alto Padrão</option>
+                <option value="luxo">Luxo</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Área para equipamentos/clube</label>
+              <select id="implEquip">
+                <option value="minimo">Mínimo (guarita)</option>
+                <option value="basico" selected>Básico (piscina + salão)</option>
+                <option value="completo">Completo (clube completo)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group full" style="margin-top:12px">
+            <label>Observações / Requisitos especiais</label>
+            <textarea id="implNotes" placeholder="Vista para o vale, trilhas ecológicas, foco em sustentabilidade..."></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="generateImplantations()" style="margin-top:12px" id="btnGenImpl">
+            🤖 Gerar Alternativas com IA
+          </button>
+        </div>
+        <div id="implantationResults"></div>
+      </div>
+
+      <!-- FINANCEIRO -->
+      <div class="panel" id="panel-financial">
+        <div class="card">
+          <div class="card-title"><span>💰</span> Análise de Viabilidade Financeira</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Custo do terreno (R$) — 0 = estimar pela IA</label>
+              <input id="finTerrenoValor" type="number" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label>Cenário de análise</label>
+              <select id="finCenario">
+                <option value="base">Base (mercado atual)</option>
+                <option value="otimista">Otimista (+15%)</option>
+                <option value="pessimista">Pessimista (-15%)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="analyzeFinancial()" style="margin-top:12px" id="btnFinancial">
+            📊 Calcular Viabilidade
+          </button>
+        </div>
+        <div id="financialResults"></div>
+      </div>
+
+      <!-- 3D VIEWER -->
+      <div class="panel" id="panel-viewer3d">
+        <div class="card">
+          <div class="card-title"><span>🎯</span> Visualização 3D</div>
+          <canvas id="canvas3d"></canvas>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="scene3D.rotation.y+=0.3">↻ Rotacionar</button>
+            <button class="btn btn-outline" onclick="zoom3D(1.2)">🔍 Zoom +</button>
+            <button class="btn btn-outline" onclick="zoom3D(0.8)">🔍 Zoom -</button>
+            <button class="btn btn-outline" onclick="reset3D()">⟳ Reset</button>
+          </div>
+          <p style="font-size:11px;color:var(--text2);margin-top:8px;">
+            Arraste para rotacionar • Scroll para zoom
+          </p>
+        </div>
+      </div>
+
+    </div><!-- /panels -->
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- MODAL NOVO PROJETO -->
+<div class="modal-overlay" id="newProjectModal">
+  <div class="modal">
+    <h2>🏗️ Novo Projeto</h2>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Nome do Projeto *</label>
+        <input id="newProjectName" placeholder="Ex: Condomínio Serra Verde" />
+      </div>
+      <div class="form-group">
+        <label>Cliente</label>
+        <input id="newProjectClient" placeholder="Nome do cliente" />
+      </div>
+      <div class="form-group">
+        <label>Tipologia</label>
+        <select id="newProjectTypology">
+          <option value="condominio_loteamento">Condomínio / Loteamento</option>
+          <option value="residencial_unifamiliar">Residencial Unifamiliar</option>
+          <option value="pousada_hotel">Pousada / Hotel</option>
+          <option value="comercial">Comercial</option>
+          <option value="industrial">Industrial</option>
+          <option value="misto">Uso Misto</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Descrição</label>
+        <textarea id="newProjectDesc" placeholder="Descrição do empreendimento..."></textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-outline" onclick="closeNewProjectModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="createProject()">Criar Projeto</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';  // mesmo servidor
+let currentProject = null;
+let map = null;
+let marker = null;
+let scene3D, camera3D, renderer3D, animId;
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  loadProjects();
+});
+
+function initMap() {
+  map = L.map('map').setView([-22.5, -44.5], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19,
+  }).addTo(map);
+  map.on('click', e => {
+    const {lat, lng} = e.latlng;
+    document.getElementById('terrainLat').value = lat.toFixed(6);
+    document.getElementById('terrainLon').value = lng.toFixed(6);
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([lat, lng]).addTo(map)
+              .bindPopup(`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`).openPopup();
+  });
+}
+
+// ── PROJECTS ─────────────────────────────────────────────────────────────
+
+async function loadProjects() {
+  const res = await fetch(`${API}/api/projects`);
+  const projects = await res.json();
+  const list = document.getElementById('projectList');
+  if (!projects.length) {
+    list.innerHTML = `<div class="empty-state" style="padding:20px"><div class="empty-icon">📁</div><small>Nenhum projeto ainda</small></div>`;
+    return;
+  }
+  list.innerHTML = projects.map(p => `
+    <div class="project-item ${currentProject?.id === p.id ? 'active' : ''}"
+         onclick="selectProject(${p.id})">
+      <div class="project-name">${p.name}</div>
+      <div class="project-meta">${p.typology || ''} · ${p.client || ''}</div>
+      <span class="status-badge status-${p.status}">${p.status}</span>
+    </div>
+  `).join('');
+}
+
+async function selectProject(id) {
+  const res = await fetch(`${API}/api/projects/${id}`);
+  currentProject = await res.json();
+  document.getElementById('projectTitle').textContent = currentProject.name;
+  loadProjects();
+  renderOverview();
+  showTab('overview');
+}
+
+function renderOverview() {
+  if (!currentProject) return;
+  const p = currentProject;
+  const steps = [
+    {name:'Terreno',     done: p.has_terrain,      tab:'terrain'},
+    {name:'Topografia',  done: p.has_topography,   tab:'topography'},
+    {name:'Implantação', done: p.has_implantation, tab:'implantation'},
+    {name:'Viabilidade', done: p.has_financial,    tab:'financial'},
+  ];
+  document.getElementById('overviewContent').innerHTML = `
+    <div class="card">
+      <div class="card-title"><span>📊</span> ${p.name}</div>
+      <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+        <div><label style="color:var(--text2);font-size:11px">CLIENTE</label><div>${p.client || '—'}</div></div>
+        <div><label style="color:var(--text2);font-size:11px">TIPOLOGIA</label><div>${p.typology || '—'}</div></div>
+        <div><label style="color:var(--text2);font-size:11px">STATUS</label>
+          <span class="status-badge status-${p.status}">${p.status}</span></div>
+      </div>
+      <div class="progress-steps">
+        ${steps.map(s => `
+          <div class="step ${s.done ? 'done' : ''}" onclick="showTab('${s.tab}');scrollTo(0,0)" style="cursor:pointer">
+            ${s.done ? '✅' : '⭕'} ${s.name}
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        ${!p.has_terrain ? `<button class="btn btn-primary" onclick="showTab('terrain')">+ Cadastrar Terreno</button>` : ''}
+        ${p.has_terrain && !p.has_topography ? `<button class="btn btn-primary" onclick="showTab('terrain')">+ Analisar Topografia</button>` : ''}
+        ${p.has_topography && !p.has_implantation ? `<button class="btn btn-primary" onclick="showTab('implantation')">+ Gerar Implantação</button>` : ''}
+        ${p.has_implantation && !p.has_financial ? `<button class="btn btn-primary" onclick="showTab('financial')">+ Analisar Viabilidade</button>` : ''}
+      </div>
+    </div>
+    <div style="color:var(--text2);font-size:12px;padding:4px 0">
+      Criado em ${new Date(p.created_at).toLocaleDateString('pt-BR')}
+    </div>
+  `;
+}
+
+// ── MODAL ────────────────────────────────────────────────────────────────
+
+function openNewProjectModal() {
+  document.getElementById('newProjectModal').classList.add('open');
+}
+function closeNewProjectModal() {
+  document.getElementById('newProjectModal').classList.remove('open');
+}
+
+async function createProject() {
+  const name = document.getElementById('newProjectName').value.trim();
+  if (!name) { alert('Informe o nome do projeto'); return; }
+  const res = await fetch(`${API}/api/projects`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      name,
+      client: document.getElementById('newProjectClient').value,
+      typology: document.getElementById('newProjectTypology').value,
+      description: document.getElementById('newProjectDesc').value,
+    })
+  });
+  const p = await res.json();
+  closeNewProjectModal();
+  await loadProjects();
+  await selectProject(p.id);
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+  if (name === 'topography' && currentProject?.has_topography) loadTopography();
+}
+
+// ── TERRAIN ──────────────────────────────────────────────────────────────
+
+async function analyzeTerrain() {
+  if (!currentProject) { alert('Selecione um projeto primeiro'); return; }
+  const area = parseFloat(document.getElementById('terrainArea').value);
+  if (!area) { alert('Informe a área do terreno'); return; }
+
+  const btn = document.getElementById('btnAnalyzeTerrain');
+  btn.textContent = '⏳ Analisando...';
+  btn.disabled = true;
+
+  const infra = [...document.querySelectorAll('.infra-cb:checked')].map(c => c.value);
+
+  const payload = {
+    project_id: currentProject.id,
+    address: document.getElementById('terrainAddress').value,
+    city: document.getElementById('terrainCity').value,
+    state: document.getElementById('terrainState').value,
+    lat: parseFloat(document.getElementById('terrainLat').value) || null,
+    lon: parseFloat(document.getElementById('terrainLon').value) || null,
+    area_ha: area,
+    topografia: document.getElementById('terrainTopo').value,
+    vegetacao: document.getElementById('terrainVeg').value,
+    acesso: document.getElementById('terrainAcesso').value,
+    infraestrutura: infra,
+    zoneamento: document.getElementById('terrainNotes').value,
+    typology_intent: document.getElementById('terrainTypology').value,
+  };
+
+  try {
+    const res = await fetch(`${API}/api/terrain/analyze`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.terrain?.lat) {
+      map.setView([data.terrain.lat, data.terrain.lon], 13);
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([data.terrain.lat, data.terrain.lon]).addTo(map)
+                .bindPopup(`📍 ${data.terrain.address}`).openPopup();
+      // Círculo aproximado da área
+      const raio = Math.sqrt(data.terrain.area_m2 / Math.PI);
+      L.circle([data.terrain.lat, data.terrain.lon], {
+        radius: raio, color: '#4fc3f7', fillColor:'#4fc3f7', fillOpacity:0.1, weight:2
+      }).addTo(map);
+    }
+
+    // Mostrar resultados na aba topografia
+    renderTopographyResults(data);
+    await loadProjects();
+    if (currentProject) { const r = await fetch(`${API}/api/projects/${currentProject.id}`); currentProject = await r.json(); renderOverview(); }
+    showTab('topography');
+
+  } catch(e) {
+    alert('Erro na análise: ' + e.message);
+  }
+
+  btn.textContent = '🔍 Analisar Terreno com IA';
+  btn.disabled = false;
+}
+
+async function loadTopography() {
+  if (!currentProject) return;
+  try {
+    const res = await fetch(`${API}/api/terrain/${currentProject.id}`);
+    const data = await res.json();
+    if (data.topography) {
+      // Reconstituir resultado para renderizar
+      renderTopographyResults({
+        terrain: data.terrain,
+        topography: {
+          ...data.topography,
+          img_topografia: data.topography.img_topografia,
+          img_zonas: data.topography.img_declividade,
+        },
+        ia: {
+          resumo: data.topography.analise_ia,
+          pontos_fortes: data.topography.pontos_fortes,
+          restricoes: data.topography.restricoes,
+          recomendacoes: data.topography.recomendacoes,
+        }
+      });
+    }
+  } catch(e) {}
+}
+
+function renderTopographyResults(data) {
+  const topo = data.topography;
+  const ia = data.ia || {};
+  const area_util_pct = topo.area_util_m2 && data.terrain
+    ? Math.round(topo.area_util_m2 / data.terrain.area_m2 * 100) : '—';
+
+  const pontos = (ia.pontos_fortes || []).map(p => `<span class="tag tag-good">✓ ${p}</span>`).join('');
+  const restricoes = (ia.restricoes || []).map(r => `<span class="tag tag-warn">⚠ ${r}</span>`).join('');
+  const recomendacoes = (ia.recomendacoes || []).map(r => `<span class="tag tag-good">→ ${r}</span>`).join('');
+
+  document.getElementById('topoContent').innerHTML = `
+    <div class="topo-metrics">
+      <div class="metric-card">
+        <div class="metric-value">${topo.desnivel || '—'}m</div>
+        <div class="metric-label">Desnível Total</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${topo.decl_media || '—'}%</div>
+        <div class="metric-label">Declividade Média</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${topo.orientacao_predominante || '—'}</div>
+        <div class="metric-label">Orientação</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${area_util_pct}%</div>
+        <div class="metric-label">Área Útil</div>
+      </div>
+    </div>
+
+    ${topo.img_topografia ? `
+    <div class="card">
+      <div class="card-title"><span>🗺️</span> Análise Topográfica</div>
+      <img class="img-result" src="data:image/png;base64,${topo.img_topografia}" alt="Topografia">
+    </div>` : ''}
+
+    ${topo.img_zonas ? `
+    <div class="card">
+      <div class="card-title"><span>📊</span> Distribuição de Declividade</div>
+      <img class="img-result" src="data:image/png;base64,${topo.img_zonas}" alt="Declividade">
+    </div>` : ''}
+
+    <div class="ia-card">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+        <div>
+          <div class="ia-score">${ia.pontuacao_geral || '—'}</div>
+          <div class="ia-label">Score do Terreno</div>
+        </div>
+        <div style="flex:1">
+          <p style="font-size:13px;line-height:1.6">${ia.resumo || 'Análise não disponível'}</p>
+        </div>
+      </div>
+      ${pontos ? `<div><p style="font-size:11px;color:var(--text2);margin-bottom:6px">PONTOS FORTES</p><div class="tag-list">${pontos}</div></div>` : ''}
+      ${restricoes ? `<div style="margin-top:10px"><p style="font-size:11px;color:var(--text2);margin-bottom:6px">RESTRIÇÕES</p><div class="tag-list">${restricoes}</div></div>` : ''}
+      ${recomendacoes ? `<div style="margin-top:10px"><p style="font-size:11px;color:var(--text2);margin-bottom:6px">RECOMENDAÇÕES</p><div class="tag-list">${recomendacoes}</div></div>` : ''}
+
+      ${ia.tipo_fundacao_recomendado ? `
+      <div style="margin-top:12px;font-size:12px">
+        <strong>Fundação recomendada:</strong> <span style="color:var(--text2)">${ia.tipo_fundacao_recomendado}</span>
+      </div>` : ''}
+      ${ia.melhor_posicionamento ? `
+      <div style="margin-top:6px;font-size:12px">
+        <strong>Posicionamento ideal:</strong> <span style="color:var(--text2)">${ia.melhor_posicionamento}</span>
+      </div>` : ''}
+    </div>
+  `;
+}
+
+// ── IMPLANTAÇÃO ──────────────────────────────────────────────────────────
+
+async function generateImplantations() {
+  if (!currentProject) { alert('Selecione um projeto'); return; }
+  const btn = document.getElementById('btnGenImpl');
+  btn.textContent = '⏳ Gerando alternativas...';
+  btn.disabled = true;
+
+  const payload = {
+    project_id: currentProject.id,
+    typology: document.getElementById('implTypology').value,
+    programa: {
+      num_lotes_desejado: parseInt(document.getElementById('implLotes').value) || null,
+      area_min_lote: parseInt(document.getElementById('implAreaMin').value) || 300,
+      area_max_lote: parseInt(document.getElementById('implAreaMax').value) || 1000,
+      padrao: document.getElementById('implPadrao').value,
+      equipamentos: document.getElementById('implEquip').value,
+      observacoes: document.getElementById('implNotes').value,
+    }
+  };
+
+  try {
+    const res = await fetch(`${API}/api/implantation/generate`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    renderImplantationResults(data);
+    await loadProjects();
+  } catch(e) { alert('Erro: ' + e.message); }
+
+  btn.textContent = '🤖 Gerar Alternativas com IA';
+  btn.disabled = false;
+}
+
+function renderImplantationResults(data) {
+  const alts = data.alternativas || [];
+  document.getElementById('implantationResults').innerHTML = `
+    <div class="card">
+      <div class="card-title"><span>🏗️</span> Alternativas de Implantação</div>
+      ${data.recomendacao ? `<div class="ia-card" style="margin-bottom:16px">
+        <p style="font-size:13px">💡 <strong>Recomendação IA:</strong> ${data.recomendacao}</p>
+      </div>` : ''}
+      <div class="alternatives-grid">
+        ${alts.map(alt => `
+          <div class="alt-card" id="alt-${alt.id}" onclick="selectAlt(${alt.id})">
+            <div class="alt-name">${alt.nome}</div>
+            <p style="font-size:12px;color:var(--text2);margin-bottom:10px">${alt.descricao || ''}</p>
+            <div class="alt-score">${alt.scores?.viabilidade || '—'}<span style="font-size:14px;color:var(--text2)">/10</span></div>
+            <div class="alt-stats">
+              <div class="alt-stat"><strong>${alt.num_lotes || '—'}</strong>Lotes</div>
+              <div class="alt-stat"><strong>${alt.area_media_lote ? Math.round(alt.area_media_lote)+'m²' : '—'}</strong>Área média</div>
+              <div class="alt-stat"><strong>${alt.scores?.tecnico || '—'}</strong>Técnico</div>
+              <div class="alt-stat"><strong>${alt.scores?.ambiental || '—'}</strong>Ambiental</div>
+            </div>
+            ${alt.custo_estimado ? `<div style="margin-top:10px;font-size:11px;color:var(--warn)">Infraest.: ${alt.custo_estimado}</div>` : ''}
+            ${alt.vgv_estimado ? `<div style="font-size:11px;color:var(--success)">VGV: ${alt.vgv_estimado}</div>` : ''}
+            <div style="margin-top:8px">
+              ${(alt.vantagens||[]).map(v=>`<div style="font-size:11px;color:var(--success)">✓ ${v}</div>`).join('')}
+              ${(alt.desvantagens||[]).map(v=>`<div style="font-size:11px;color:var(--warn)">⚠ ${v}</div>`).join('')}
+            </div>
+            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="selectAlt(${alt.id})">
+              Selecionar esta opção
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function selectAlt(id) {
+  if (!currentProject) return;
+  await fetch(`${API}/api/implantation/select`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({project_id: currentProject.id, implantation_id: id})
+  });
+  document.querySelectorAll('.alt-card').forEach(c => c.classList.remove('selected'));
+  const el = document.getElementById(`alt-${id}`);
+  if (el) el.classList.add('selected');
+  await loadProjects();
+  const r = await fetch(`${API}/api/projects/${currentProject.id}`);
+  currentProject = await r.json();
+  renderOverview();
+}
+
+// ── FINANCEIRO ───────────────────────────────────────────────────────────
+
+async function analyzeFinancial() {
+  if (!currentProject) { alert('Selecione um projeto'); return; }
+  const btn = document.getElementById('btnFinancial');
+  btn.textContent = '⏳ Calculando...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/financial/analyze`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        project_id: currentProject.id,
+        cenario: document.getElementById('finCenario').value,
+        custo_terreno: parseFloat(document.getElementById('finTerrenoValor').value) || 0,
+      })
+    });
+    const data = await res.json();
+    renderFinancialResults(data);
+    await loadProjects();
+  } catch(e) { alert('Erro: ' + e.message); }
+
+  btn.textContent = '📊 Calcular Viabilidade';
+  btn.disabled = false;
+}
+
+function fmt(n) {
+  if (!n) return '—';
+  return 'R$ ' + (n/1e6).toFixed(2) + 'M';
+}
+
+function renderFinancialResults(data) {
+  const res = data.resultado || {};
+  const rec = data.receitas || {};
+  const cus = data.custos || {};
+  const cen = data.cenarios || {};
+
+  document.getElementById('financialResults').innerHTML = `
+    <div class="fin-kpis">
+      <div class="kpi">
+        <div class="kpi-value kpi-neutral">${fmt(rec.vgv_total)}</div>
+        <div class="kpi-label">VGV Total</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value kpi-positive">${fmt(res.lucro_bruto)}</div>
+        <div class="kpi-label">Lucro Bruto</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value ${(res.margem_bruta_percent||0)>=20?'kpi-positive':'kpi-warn'}">${res.margem_bruta_percent || '—'}%</div>
+        <div class="kpi-label">Margem Bruta</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-value kpi-neutral">${res.payback_meses || '—'} meses</div>
+        <div class="kpi-label">Payback</div>
+      </div>
+    </div>
+
+    ${data.img_financeiro ? `
+    <div class="card">
+      <div class="card-title"><span>📈</span> Análise Financeira</div>
+      <img class="img-result" src="data:image/png;base64,${data.img_financeiro}" alt="Financeiro">
+    </div>` : ''}
+
+    <div class="card">
+      <div class="card-title"><span>📊</span> Cenários</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        ${['pessimista','base','otimista'].map(c => {
+          const s = cen[c] || {};
+          return `<div style="background:#0d0f1a;padding:14px;border-radius:8px;border:1px solid var(--border)">
+            <div style="font-size:11px;text-transform:uppercase;color:var(--text2);margin-bottom:8px">${c}</div>
+            <div style="font-size:15px;font-weight:700">${fmt(s.vgv)}</div>
+            <div style="font-size:11px;color:var(--text2)">VGV</div>
+            <div style="margin-top:6px;font-size:13px;color:${(s.margem||0)>=20?'var(--success)':'var(--warn)'}">
+              Margem: ${s.margem || '—'}%
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    ${(data.recomendacoes_financeiras||[]).length ? `
+    <div class="card">
+      <div class="card-title"><span>💡</span> Recomendações</div>
+      ${data.recomendacoes_financeiras.map(r=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">→ ${r}</div>`).join('')}
+    </div>` : ''}
+
+    ${(data.alertas||[]).length ? `
+    <div class="card" style="border-color:rgba(244,67,54,.3)">
+      <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Alertas</div>
+      ${data.alertas.map(a=>`<div style="padding:6px 0;font-size:13px;color:var(--warn)">⚠ ${a}</div>`).join('')}
+    </div>` : ''}
+  `;
+}
+
+// ── 3D ───────────────────────────────────────────────────────────────────
+
+function init3D() {
+  const canvas = document.getElementById('canvas3d');
+  if (renderer3D) return;
+
+  scene3D = new THREE.Scene();
+  scene3D.background = new THREE.Color(0x0d0f1a);
+
+  camera3D = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+  camera3D.position.set(30, 25, 30);
+  camera3D.lookAt(0, 0, 0);
+
+  renderer3D = new THREE.WebGLRenderer({canvas, antialias: true});
+  renderer3D.setSize(canvas.clientWidth, canvas.clientHeight);
+  renderer3D.shadowMap.enabled = true;
+
+  // Luzes
+  scene3D.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const dir = new THREE.DirectionalLight(0xffffff, 1);
+  dir.position.set(20, 30, 20);
+  dir.castShadow = true;
+  scene3D.add(dir);
+
+  // Grid
+  scene3D.add(new THREE.GridHelper(60, 30, 0x1e2340, 0x1e2340));
+
+  // Exemplo: terreno + volumes
+  _add3DExample();
+
+  // Mouse rotate
+  let isDragging = false, prevX, prevY;
+  canvas.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; });
+  canvas.addEventListener('mouseup', () => isDragging = false);
+  canvas.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - prevX, dy = e.clientY - prevY;
+    scene3D.rotation.y += dx * 0.01;
+    scene3D.rotation.x += dy * 0.01;
+    prevX = e.clientX; prevY = e.clientY;
+  });
+  canvas.addEventListener('wheel', e => { camera3D.position.multiplyScalar(1 + e.deltaY * 0.001); });
+
+  function animate() {
+    animId = requestAnimationFrame(animate);
+    renderer3D.render(scene3D, camera3D);
+  }
+  animate();
+}
+
+function _add3DExample() {
+  // Plataforma (terreno)
+  const geo = new THREE.BoxGeometry(40, 1, 30);
+  const mat = new THREE.MeshLambertMaterial({color: 0x4a5c3a});
+  const terrain = new THREE.Mesh(geo, mat);
+  terrain.position.y = -0.5;
+  scene3D.add(terrain);
+
+  // Volumes de lotes
+  const colors = [0x4fc3f7, 0x81d4fa, 0x29b6f6, 0x039be5];
+  for (let i = 0; i < 8; i++) {
+    const h = 2 + Math.random() * 4;
+    const g = new THREE.BoxGeometry(3, h, 4);
+    const m = new THREE.MeshLambertMaterial({color: colors[i % colors.length], transparent:true, opacity:.85});
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.set(-14 + (i % 4) * 8, h/2, -6 + Math.floor(i/4) * 10);
+    scene3D.add(mesh);
+    // Borda
+    const edges = new THREE.EdgesGeometry(g);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x000000, opacity:.3, transparent:true}));
+    line.position.copy(mesh.position);
+    scene3D.add(line);
+  }
+}
+
+function zoom3D(factor) {
+  if (camera3D) camera3D.position.multiplyScalar(factor);
+}
+
+function reset3D() {
+  if (!scene3D) return;
+  scene3D.rotation.set(0, 0, 0);
+  camera3D.position.set(30, 25, 30);
+  camera3D.lookAt(0, 0, 0);
+}
+
+// ── MODAL new project ─────────────────────────────────────────────────────
+
+document.getElementById('newProjectModal').addEventListener('click', function(e) {
+  if (e.target === this) closeNewProjectModal();
+});
+</script>
+</body>
+</html>
