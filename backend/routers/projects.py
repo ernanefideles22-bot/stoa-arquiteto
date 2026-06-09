@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+import traceback
+import os
 
-from ..models.database import get_db, Project
+from ..models.database import get_db, Project, engine
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -24,26 +26,48 @@ class ProjectUpdate(BaseModel):
     status: Optional[str] = None
 
 
+@router.get("/debug-db")
+def debug_db():
+    """Endpoint temporario para diagnosticar conexao com DB"""
+    import os
+    db_url = os.getenv("DATABASE_URL", "NOT SET")
+    # Mascara a senha para log seguro
+    masked = db_url[:20] + "..." if len(db_url) > 20 else db_url
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(__import__("sqlalchemy").text("SELECT 1 as ok"))
+            row = result.fetchone()
+            return {"status": "ok", "result": row[0], "url_prefix": masked}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "url_prefix": masked, "traceback": traceback.format_exc()[-500:]}
+
+
 @router.get("")
 def list_projects(db: Session = Depends(get_db)):
-    projects = db.query(Project).order_by(Project.updated_at.desc()).all()
-    return [_serialize(p) for p in projects]
+    try:
+        projects = db.query(Project).order_by(Project.updated_at.desc()).all()
+        return [_serialize(p) for p in projects]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": str(e), "traceback": traceback.format_exc()[-500:]})
 
 
 @router.post("")
 def create_project(data: ProjectCreate, db: Session = Depends(get_db)):
-    p = Project(**data.model_dump())
-    db.add(p)
-    db.commit()
-    db.refresh(p)
-    return _serialize(p)
+    try:
+        p = Project(**data.model_dump())
+        db.add(p)
+        db.commit()
+        db.refresh(p)
+        return _serialize(p)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": str(e), "traceback": traceback.format_exc()[-500:]})
 
 
 @router.get("/{project_id}")
 def get_project(project_id: int, db: Session = Depends(get_db)):
     p = db.query(Project).filter(Project.id == project_id).first()
     if not p:
-        raise HTTPException(404, "Projeto não encontrado")
+        raise HTTPException(404, "Projeto nao encontrado")
     return _serialize_full(p)
 
 
@@ -51,7 +75,7 @@ def get_project(project_id: int, db: Session = Depends(get_db)):
 def update_project(project_id: int, data: ProjectUpdate, db: Session = Depends(get_db)):
     p = db.query(Project).filter(Project.id == project_id).first()
     if not p:
-        raise HTTPException(404, "Projeto não encontrado")
+        raise HTTPException(404, "Projeto nao encontrado")
     for k, v in data.model_dump(exclude_none=True).items():
         setattr(p, k, v)
     p.updated_at = datetime.utcnow()
@@ -64,7 +88,7 @@ def update_project(project_id: int, data: ProjectUpdate, db: Session = Depends(g
 def delete_project(project_id: int, db: Session = Depends(get_db)):
     p = db.query(Project).filter(Project.id == project_id).first()
     if not p:
-        raise HTTPException(404, "Projeto não encontrado")
+        raise HTTPException(404, "Projeto nao encontrado")
     db.delete(p)
     db.commit()
     return {"ok": True}
