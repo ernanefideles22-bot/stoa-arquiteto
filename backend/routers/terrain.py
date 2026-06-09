@@ -194,3 +194,43 @@ def get_terrain(project_id: int, db: Session = Depends(get_db)):
         "terrain": {k: v for k, v in t.__dict__.items() if not k.startswith("_")},
         "topography": {k: v for k, v in topo.__dict__.items() if not k.startswith("_")} if topo else None,
     }
+
+
+@router.get("/{project_id}/elevation")
+def get_elevation(project_id: int, db: Session = Depends(get_db)):
+    """Return elevation grid + implantation data for 3D viewer."""
+    import json as _json
+    from ..models.database import Implantation
+    
+    topo = db.query(Topography).filter(Topography.project_id == project_id).first()
+    terrain = db.query(Terrain).filter(Terrain.project_id == project_id).first()
+    imp = db.query(Implantation).filter(Implantation.project_id == project_id).first()
+
+    elevation_grid = None
+    if topo and topo.elevation_grid:
+        try:
+            elevation_grid = _json.loads(topo.elevation_grid) if isinstance(topo.elevation_grid, str) else topo.elevation_grid
+        except Exception:
+            elevation_grid = None
+
+    lotes = []
+    if imp and imp.layout_geojson:
+        try:
+            layout = _json.loads(imp.layout_geojson) if isinstance(imp.layout_geojson, str) else imp.layout_geojson
+            features = layout.get("features", []) if isinstance(layout, dict) else []
+            for f in features:
+                props = f.get("properties", {})
+                geom = f.get("geometry", {})
+                lotes.append({"tipo": props.get("tipo", "lote"), "geometry": geom, "area": props.get("area", 0)})
+        except Exception:
+            lotes = []
+
+    return {
+        "elevation_grid": elevation_grid,
+        "area_ha": terrain.area_ha if terrain else None,
+        "lat_center": terrain.latitude if terrain else None,
+        "lon_center": terrain.longitude if terrain else None,
+        "lotes": lotes,
+        "num_lotes": imp.num_lotes if imp else 0,
+        "area_media_lote": imp.area_media_lote if imp else 0,
+    }
