@@ -15,11 +15,11 @@ SYSTEM = (
 )
 
 
-async def _ask(prompt: str, temperature: float = 0.3) -> dict:
+async def _ask(prompt: str, temperature: float = 0.3, max_tokens: int = 2048) -> dict:
     """Chama o Claude e parseia JSON da resposta."""
     resp = await client.messages.create(
         model=MODEL,
-        max_tokens=2048,
+        max_tokens=max_tokens,
         temperature=temperature,
         system=SYSTEM,
         messages=[{"role": "user", "content": prompt}],
@@ -185,15 +185,10 @@ PROGRAMA (implantação selecionada):
 - Área média por lote: {implantation.get('area_media_lote_m2', 0)} m²
 - Área construída total: {implantation.get('area_construida_total_m2', 0)} m²
 - Área de vias: {implantation.get('area_vias_m2', 0)} m²
-- Infraestrutura: {implantation.get('custo_estimado_infraestrutura', 'não estimado')}
-
-ARQUITETURA:
-- Sistema construtivo: {architecture.get('sistema_estrutural', 'convencional')}
-- Estimativa custo/m²: {architecture.get('estimativa_custo_m2', 'não estimado')}
 
 CENÁRIO: {cenario} (considere índices do mercado imobiliário brasileiro atual)
 
-Retorne JSON detalhado:
+Retorne JSON:
 {{
   "custos": {{
     "terreno": 0,
@@ -235,7 +230,7 @@ Retorne JSON detalhado:
   "alertas": ["riscos financeiros identificados"]
 }}
 """
-    return await _ask(prompt, temperature=0.2)
+    return await _ask(prompt, temperature=0.2, max_tokens=4096)
 
 
 # ─── RELATÓRIO EXECUTIVO ────────────────────────────────────────────────────
