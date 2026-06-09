@@ -62,7 +62,7 @@ async def analyze_terrain(data: TerrainInput, db: Session = Depends(get_db)):
     elevation_grid = await geo_service.get_elevation_grid(lat, lon, data.area_ha)
 
     # 3. Métricas topográficas
-    topo_metrics = geo_service.analyze_topography(elevation_grid)
+    topo_metrics = geo_service.analyze_topography(elevation_grid, area_m2=area_m2)
 
     # 4. Insolação
     solar = geo_service.get_solar_info(lat, topo_metrics["orientacao_predominante"])

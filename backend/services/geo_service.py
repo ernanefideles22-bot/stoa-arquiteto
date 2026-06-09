@@ -1,7 +1,7 @@
 """
 Serviço geoespacial — STOA Civil
 Busca dados reais de elevação, geocodificação e análise topográfica.
-Fontes: Nominatim (OSM), Open-Elevation (SRTM 90m), OpenTopoData
+Fontes: Nominatim (OSM), OpenTopoData (SRTM 90m)
 """
 import httpx
 import numpy as np
@@ -40,21 +40,16 @@ async def geocode_address(address: str) -> Optional[dict]:
 async def get_elevation_grid(lat: float, lon: float, area_ha: float) -> dict:
     """
     Busca grade de elevação real ao redor do ponto central.
-    Resolução adaptada à área do terreno.
     Usa OpenTopoData (SRTM 90m) — gratuito, sem API key.
     """
-    # Raio aproximado em graus para cobrir a área
-    lado_m = math.sqrt(area_ha * 10000) * 1.4  # buffer 40%
-    delta = lado_m / 111_000  # graus aproximados
+    lado_m = math.sqrt(area_ha * 10_000) * 1.4  # buffer 40%
+    delta = lado_m / 111_000  # graus
 
-    # Grid de pontos (máx 100 pontos por requisição na API gratuita)
     n = 8 if area_ha < 10 else (10 if area_ha < 100 else 12)
     lats = np.linspace(lat - delta, lat + delta, n)
     lons = np.linspace(lon - delta, lon + delta, n)
 
-    # Montar lista de localizações
-    locations = "|".join(f"{la:.6f},{lo:.6f}"
-                         for la in lats for lo in lons)
+    locations = "|".join(f"{la:.6f},{lo:.6f}" for la in lats for lo in lons)
 
     try:
         async with httpx.AsyncClient(timeout=30) as c:
@@ -73,15 +68,11 @@ async def get_elevation_grid(lat: float, lon: float, area_ha: float) -> dict:
         grid_z = np.array(elevations).reshape(n, n)
 
     except Exception:
-        # Fallback sintético se a API falhar (desenvolvimento offline)
         grid_z = _synthetic_elevation(n, lat, lon, area_ha)
 
-    grid_lats = lats.tolist()
-    grid_lons = lons.tolist()
-
     return {
-        "lats": grid_lats,
-        "lons": grid_lons,
+        "lats": lats.tolist(),
+        "lons": lons.tolist(),
         "elevations": grid_z.tolist(),
         "n": n,
         "resolution_m": int(lado_m * 2 / n),
@@ -104,10 +95,10 @@ def _synthetic_elevation(n: int, lat: float, lon: float, area_ha: float) -> np.n
 
 # ─── ANÁLISE TOPOGRÁFICA ────────────────────────────────────────────────────
 
-def analyze_topography(elevation_grid: dict) -> dict:
+def analyze_topography(elevation_grid: dict, area_m2: float = None) -> dict:
     """
     Calcula métricas topográficas a partir da grade de elevação.
-    Retorna zonas de declividade, área útil, drenagem, etc.
+    area_m2: área real do terreno (para calibrar áreas úteis/restritas).
     """
     Z = np.array(elevation_grid["elevations"])
     n = elevation_grid["n"]
@@ -117,7 +108,7 @@ def analyze_topography(elevation_grid: dict) -> dict:
     alt_max = float(Z.max())
     desnivel = round(alt_max - alt_min, 1)
 
-    # Gradiente → declividade
+    # Gradiente → declividade em %
     dzdx = np.gradient(Z, axis=1) / res
     dzdy = np.gradient(Z, axis=0) / res
     slope_pct = np.sqrt(dzdx**2 + dzdy**2) * 100
@@ -125,39 +116,38 @@ def analyze_topography(elevation_grid: dict) -> dict:
     decl_media = round(float(slope_pct.mean()), 1)
     decl_max   = round(float(slope_pct.max()), 1)
 
-    # Área total do grid analisado
-    area_grid_m2 = (n * res) ** 2
-
-    # Classificação NBR 6118 / norma de parcelamento
-    plano     = float((slope_pct < 5).sum())  / slope_pct.size
-    suave     = float(((slope_pct >= 5)  & (slope_pct < 15)).sum()) / slope_pct.size
-    moderado  = float(((slope_pct >= 15) & (slope_pct < 30)).sum()) / slope_pct.size
-    ingreme   = float(((slope_pct >= 30) & (slope_pct < 45)).sum()) / slope_pct.size
+    # Frações por zona de declividade
+    plano         = float((slope_pct < 5).sum()) / slope_pct.size
+    suave         = float(((slope_pct >= 5)  & (slope_pct < 15)).sum()) / slope_pct.size
+    moderado      = float(((slope_pct >= 15) & (slope_pct < 30)).sum()) / slope_pct.size
+    ingreme       = float(((slope_pct >= 30) & (slope_pct < 45)).sum()) / slope_pct.size
     muito_ingreme = float((slope_pct >= 45).sum()) / slope_pct.size
 
+    # Área de referência: terreno real se fornecida, senão o grid
+    ref_m2 = area_m2 if area_m2 else (n * res) ** 2
+
     zonas = [
-        {"tipo": "Plano (0–5%)",        "percentual": round(plano * 100, 1),
-         "area_m2": round(plano * area_grid_m2)},
-        {"tipo": "Suave (5–15%)",        "percentual": round(suave * 100, 1),
-         "area_m2": round(suave * area_grid_m2)},
-        {"tipo": "Moderado (15–30%)",    "percentual": round(moderado * 100, 1),
-         "area_m2": round(moderado * area_grid_m2)},
-        {"tipo": "Íngreme (30–45%)",     "percentual": round(ingreme * 100, 1),
-         "area_m2": round(ingreme * area_grid_m2)},
-        {"tipo": "Muito Íngreme (>45%)", "percentual": round(muito_ingreme * 100, 1),
-         "area_m2": round(muito_ingreme * area_grid_m2)},
+        {"tipo": "Plano (0-5%)",        "percentual": round(plano * 100, 1),
+         "area_m2": round(plano * ref_m2)},
+        {"tipo": "Suave (5-15%)",        "percentual": round(suave * 100, 1),
+         "area_m2": round(suave * ref_m2)},
+        {"tipo": "Moderado (15-30%)",    "percentual": round(moderado * 100, 1),
+         "area_m2": round(moderado * ref_m2)},
+        {"tipo": "Ingreme (30-45%)",     "percentual": round(ingreme * 100, 1),
+         "area_m2": round(ingreme * ref_m2)},
+        {"tipo": "Muito Ingreme (>45%)", "percentual": round(muito_ingreme * 100, 1),
+         "area_m2": round(muito_ingreme * ref_m2)},
     ]
 
-    # Área útil = declividade < 30% (limite loteamento urbano)
-    area_util_pct = plano + suave + moderado
-    area_util_m2  = round(area_util_pct * area_grid_m2)
+    area_util_m2     = round((plano + suave + moderado) * ref_m2)
+    area_restrita_m2 = round((ingreme + muito_ingreme) * ref_m2)
 
-    # Orientação predominante da face mais alta → mais baixa
+    # Orientação predominante da face
     dz_mean_x = float(dzdx.mean())
     dz_mean_y = float(dzdy.mean())
     orientacao = _get_orientacao(dz_mean_x, dz_mean_y)
 
-    # Ponto mais baixo → concentração de drenagem
+    # Ponto de menor elevação (drenagem)
     idx_min = np.unravel_index(Z.argmin(), Z.shape)
     lats = elevation_grid["lats"]
     lons = elevation_grid["lons"]
@@ -171,7 +161,7 @@ def analyze_topography(elevation_grid: dict) -> dict:
         "orientacao_predominante": orientacao,
         "zonas": zonas,
         "area_util_m2": area_util_m2,
-        "area_restrita_m2": round((ingreme + muito_ingreme) * area_grid_m2),
+        "area_restrita_m2": area_restrita_m2,
         "ponto_drenagem": {
             "lat": lats[min(idx_min[0], len(lats)-1)],
             "lon": lons[min(idx_min[1], len(lons)-1)],
@@ -193,20 +183,20 @@ def get_solar_info(lat: float, orientacao: str) -> dict:
     hemisferio = "Sul" if lat < 0 else "Norte"
 
     faces_sol = {
-        "N":  "Recebe sol o dia todo (hemisfério sul)" if lat < 0 else "Pouca incidência direta",
-        "S":  "Pouca incidência direta (hemisfério sul)" if lat < 0 else "Recebe sol o dia todo",
-        "L":  "Sol da manhã — ideal para dormitórios",
-        "O":  "Sol da tarde — ideal para áreas sociais",
-        "NE": "Sol manhã/tarde — excelente para condomínios",
-        "NO": "Sol tarde — bom para áreas sociais",
-        "SE": "Sol manhã — bom para dormitórios",
-        "SO": "Sol tarde — cuidado com superaquecimento",
+        "N":  "Recebe sol o dia todo (hemisferio sul)" if lat < 0 else "Pouca incidencia direta",
+        "S":  "Pouca incidencia direta (hemisferio sul)" if lat < 0 else "Recebe sol o dia todo",
+        "L":  "Sol da manha - ideal para dormitorios",
+        "O":  "Sol da tarde - ideal para areas sociais",
+        "NE": "Sol manha/tarde - excelente para condominios",
+        "NO": "Sol tarde - bom para areas sociais",
+        "SE": "Sol manha - bom para dormitorios",
+        "SO": "Sol tarde - cuidado com superaquecimento",
     }
 
     return {
         "hemisferio": hemisferio,
         "orientacao": orientacao,
-        "descricao": faces_sol.get(orientacao, "Orientação mista"),
+        "descricao": faces_sol.get(orientacao, "Orientacao mista"),
         "recomendacao_implantacao": (
             "Posicionar frente dos lotes voltada para N ou NE"
             if lat < 0 else

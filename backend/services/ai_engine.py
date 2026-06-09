@@ -1,29 +1,36 @@
 """
 Motor de IA — STOA Civil
-Orquestra análises usando GPT-4o. Cada função recebe dados reais e retorna análise estruturada.
+Orquestra análises usando Claude (Anthropic). Cada função recebe dados reais e retorna análise estruturada.
 """
 import json
 import os
-from openai import AsyncOpenAI
+import anthropic
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-MODEL = "gpt-4o-mini"
+client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+MODEL = "claude-sonnet-4-5"
+
+SYSTEM = (
+    "Você é um especialista em engenharia civil, arquitetura, urbanismo e desenvolvimento imobiliário no Brasil. "
+    "Responde sempre em JSON estruturado, sem markdown, sem texto fora do JSON."
+)
 
 
 async def _ask(prompt: str, temperature: float = 0.3) -> dict:
-    """Chama o modelo e parseia JSON da resposta."""
-    resp = await client.chat.completions.create(
+    """Chama o Claude e parseia JSON da resposta."""
+    resp = await client.messages.create(
         model=MODEL,
-        messages=[
-            {"role": "system", "content":
-             "Você é um especialista em engenharia civil, arquitetura, urbanismo e desenvolvimento imobiliário no Brasil. "
-             "Responde sempre em JSON estruturado, sem markdown, sem texto fora do JSON."},
-            {"role": "user", "content": prompt}
-        ],
+        max_tokens=4096,
         temperature=temperature,
-        response_format={"type": "json_object"},
+        system=SYSTEM,
+        messages=[{"role": "user", "content": prompt}],
     )
-    return json.loads(resp.choices[0].message.content)
+    text = resp.content[0].text.strip()
+    # Remove possível bloco markdown ```json ... ```
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    return json.loads(text)
 
 
 # ─── ANÁLISE DE TERRENO ─────────────────────────────────────────────────────
@@ -54,18 +61,18 @@ CARACTERÍSTICAS:
 Retorne JSON com:
 {{
   "resumo": "análise técnica em 3-4 frases sobre o potencial do terreno",
-  "pontuacao_geral": número 0-10,
+  "pontuacao_geral": numero 0-10,
   "pontos_fortes": ["lista dos maiores ativos do terreno"],
   "restricoes": ["desafios técnicos e legais identificados"],
   "recomendacoes": ["ações prioritárias recomendadas"],
   "tipo_fundacao_recomendado": "tipo mais adequado e justificativa",
   "movimentacao_terra": "estimativa de corte/aterro necessário",
   "aptidao": {{
-    "residencial_unifamiliar": score 0-10,
-    "condominio_loteamento": score 0-10,
-    "comercial": score 0-10,
-    "pousada_hotel": score 0-10,
-    "industrial": score 0-10
+    "residencial_unifamiliar": 0,
+    "condominio_loteamento": 0,
+    "comercial": 0,
+    "pousada_hotel": 0,
+    "industrial": 0
   }},
   "potencial_construtivo": "estimativa de m² construível considerando topografia e recuos",
   "riscos_criticos": ["riscos que precisam de atenção imediata"]
@@ -99,28 +106,28 @@ Retorne JSON:
       "nome": "nome da alternativa",
       "conceito": "estratégia e filosofia desta alternativa (2-3 frases)",
       "programa": {{
-        "num_lotes": número,
-        "area_media_lote_m2": número,
-        "area_construida_total_m2": número,
-        "area_verde_m2": número,
-        "area_vias_m2": número,
-        "area_equipamentos_m2": número,
-        "coef_aproveitamento": número decimal
+        "num_lotes": 0,
+        "area_media_lote_m2": 0,
+        "area_construida_total_m2": 0,
+        "area_verde_m2": 0,
+        "area_vias_m2": 0,
+        "area_equipamentos_m2": 0,
+        "coef_aproveitamento": 0.0
       }},
       "scores": {{
-        "tecnico": 0-10,
-        "economico": 0-10,
-        "ambiental": 0-10,
-        "viabilidade": 0-10
+        "tecnico": 0,
+        "economico": 0,
+        "ambiental": 0,
+        "viabilidade": 0
       }},
       "vantagens": ["lista"],
       "desvantagens": ["lista"],
       "custo_estimado_infraestrutura": "faixa em R$",
       "vgv_estimado": "faixa do Valor Geral de Vendas em R$",
-      "prazo_obra_meses": número
+      "prazo_obra_meses": 0
     }}
   ],
-  "recomendacao": "qual alternativa recomendar e por quê"
+  "recomendacao": "qual alternativa recomendar e por que"
 }}
 """
     return await _ask(prompt, temperature=0.5)
@@ -151,7 +158,7 @@ Retorne JSON:
   "sustentabilidade": ["soluções sustentáveis incorporadas"],
   "diferenciais": ["pontos de destaque do projeto"],
   "programa_definitivo": [
-    {{"comodo": "nome", "area_m2": número, "caracteristicas": "descrição"}}
+    {{"comodo": "nome", "area_m2": 0, "caracteristicas": "descrição"}}
   ],
   "sistema_estrutural": "sistema construtivo recomendado e justificativa",
   "estimativa_custo_m2": "faixa de custo por m² para a região",
@@ -189,40 +196,40 @@ CENÁRIO: {cenario} (considere índices do mercado imobiliário brasileiro atual
 Retorne JSON detalhado:
 {{
   "custos": {{
-    "terreno": número_em_reais,
-    "infraestrutura_loteamento": número,
-    "construcao": número,
-    "projetos_aprovacoes": número,
-    "marketing_vendas": número,
-    "financeiro_juros": número,
-    "contingencia_percent": número,
-    "total": número
+    "terreno": 0,
+    "infraestrutura_loteamento": 0,
+    "construcao": 0,
+    "projetos_aprovacoes": 0,
+    "marketing_vendas": 0,
+    "financeiro_juros": 0,
+    "contingencia_percent": 0,
+    "total": 0
   }},
   "receitas": {{
-    "vgv_total": número,
-    "preco_medio_por_lote": número,
-    "preco_m2_venda": número,
-    "velocidade_venda_meses": número
+    "vgv_total": 0,
+    "preco_medio_por_lote": 0,
+    "preco_m2_venda": 0,
+    "velocidade_venda_meses": 0
   }},
   "resultado": {{
-    "lucro_bruto": número,
-    "margem_bruta_percent": número,
-    "roi_percent": número,
-    "payback_meses": número,
-    "tir_anual_percent": número
+    "lucro_bruto": 0,
+    "margem_bruta_percent": 0,
+    "roi_percent": 0,
+    "payback_meses": 0,
+    "tir_anual_percent": 0
   }},
-  "custo_por_lote": número,
-  "custo_por_m2_construido": número,
+  "custo_por_lote": 0,
+  "custo_por_m2_construido": 0,
   "cronograma_financeiro": [
-    {{"fase": "nome", "duracao_meses": número, "custo": número, "percentual": número}}
+    {{"fase": "nome", "duracao_meses": 0, "custo": 0, "percentual": 0}}
   ],
   "fluxo_caixa_anual": [
-    {{"ano": número, "investimento": número, "receita": número, "saldo_acumulado": número}}
+    {{"ano": 0, "investimento": 0, "receita": 0, "saldo_acumulado": 0}}
   ],
   "cenarios": {{
-    "otimista": {{"vgv": número, "lucro": número, "margem": número}},
-    "base": {{"vgv": número, "lucro": número, "margem": número}},
-    "pessimista": {{"vgv": número, "lucro": número, "margem": número}}
+    "otimista": {{"vgv": 0, "lucro": 0, "margem": 0}},
+    "base": {{"vgv": 0, "lucro": 0, "margem": 0}},
+    "pessimista": {{"vgv": 0, "lucro": 0, "margem": 0}}
   }},
   "recomendacoes_financeiras": ["lista"],
   "alertas": ["riscos financeiros identificados"]

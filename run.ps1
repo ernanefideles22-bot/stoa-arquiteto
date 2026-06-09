@@ -3,7 +3,7 @@ Set-Location $PSScriptRoot
 
 if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
-    Write-Host "ATENCAO: Configure OPENAI_API_KEY no arquivo .env antes de continuar." -ForegroundColor Yellow
+    Write-Host "ATENCAO: Configure ANTHROPIC_API_KEY no arquivo .env antes de continuar." -ForegroundColor Yellow
     notepad .env
     exit
 }
