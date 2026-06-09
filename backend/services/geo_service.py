@@ -52,7 +52,7 @@ async def get_elevation_grid(lat: float, lon: float, area_ha: float) -> dict:
     locations = "|".join(f"{la:.6f},{lo:.6f}" for la in lats for lo in lons)
 
     try:
-        async with httpx.AsyncClient(timeout=30) as c:
+        async with httpx.AsyncClient(timeout=8) as c:
             r = await c.get(
                 "https://api.opentopodata.org/v1/srtm90m",
                 params={"locations": locations},
