@@ -32,8 +32,8 @@ async def generate_report(data: ReportRequest, db: Session = Depends(get_db)):
         if terrain:
             project_data["terreno"] = {
                 "area_ha": terrain.area_ha,
-                "municipio": terrain.municipio,
-                "zona_uso": terrain.zona_uso,
+                "municipio": terrain.city,
+                "zona_uso": terrain.zoneamento,
             }
         if imp:
             project_data["implantacao"] = {
@@ -139,8 +139,8 @@ def _build_pdf(project, terrain, imp, fin, resumo: str, project_data: dict) -> s
         pdf.cell(0, 8, "Dados do Terreno", ln=True)
         pdf.ln(2)
         _row(pdf, "Area", f"{terrain.area_ha:.2f} ha")
-        _row(pdf, "Municipio", str(terrain.municipio or "-").encode('latin-1', errors='replace').decode('latin-1'))
-        _row(pdf, "Zona de Uso", str(terrain.zona_uso or "-").encode('latin-1', errors='replace').decode('latin-1'))
+        _row(pdf, "Municipio", str(terrain.city or "-").encode('latin-1', errors='replace').decode('latin-1'))
+        _row(pdf, "Zona de Uso", str(terrain.zoneamento or "-").encode('latin-1', errors='replace').decode('latin-1'))
         pdf.ln(4)
 
     if imp:
