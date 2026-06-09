@@ -582,6 +582,7 @@ function showTab(name) {
   document.querySelector(`[data-tab="${name}"]`).classList.add('active');
   document.getElementById(`panel-${name}`).classList.add('active');
   if (name === 'topography' && currentProject?.has_topography) loadTopography();
+  if (name === 'terrain') setTimeout(() => map && map.invalidateSize(), 150);
   if (name === 'terrain' && currentProject?.has_terrain) loadTerrainForm();
 }
 
