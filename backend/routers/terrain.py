@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
-import asyncio
 
 from ..models.database import get_db, Project, Terrain, Topography
 from ..services import geo_service, ai_engine, chart_service
@@ -10,7 +9,7 @@ from ..services import geo_service, ai_engine, chart_service
 router = APIRouter(prefix="/api/terrain", tags=["terrain"])
 
 
-class TerrainInput(BaseModel):
+class TerrainSave(BaseModel):
     project_id: int
     address: Optional[str] = None
     city: Optional[str] = None
@@ -27,71 +26,48 @@ class TerrainInput(BaseModel):
     typology_intent: Optional[str] = None
 
 
-@router.post("/analyze")
-async def analyze_terrain(data: TerrainInput, db: Session = Depends(get_db)):
+class TerrainAnalyze(BaseModel):
+    project_id: int
+
+
+@router.post("/save")
+async def save_terrain(data: TerrainSave, db: Session = Depends(get_db)):
     """
-    Endpoint principal: geocodifica, busca elevação real, analisa topografia e IA.
-    Retorna análise completa do terreno.
+    Passo 1: salva dados do terreno e geocodifica endereco.
+    Rapido (~3s), sem analise de elevacao nem IA.
     """
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
-        raise HTTPException(404, "Projeto não encontrado")
+        raise HTTPException(404, "Projeto nao encontrado")
 
-    # 1. Coordenadas
     lat, lon = data.lat, data.lon
     address_display = data.address or ""
+    city, state = data.city, data.state
 
+    # Geocodificar se nao tiver coordenadas
     if not lat and data.address:
-        geo = await geo_service.geocode_address(
-            f"{data.address}, {data.city or ''}, {data.state or ''}, Brasil"
-        )
-        if geo:
-            lat, lon = geo["lat"], geo["lon"]
-            if not data.city:
-                data.city = geo.get("city")
-            if not data.state:
-                data.state = geo.get("state")
-            address_display = geo.get("display_name", data.address)
-
-    if not lat:
-        raise HTTPException(400, "Informe endereço válido ou coordenadas lat/lon")
+        try:
+            geo = await geo_service.geocode_address(
+                f"{data.address}, {data.city or ''}, {data.state or ''}, Brasil"
+            )
+            if geo:
+                lat, lon = geo["lat"], geo["lon"]
+                city = city or geo.get("city")
+                state = state or geo.get("state")
+                address_display = geo.get("display_name", data.address)
+        except Exception:
+            pass
 
     area_m2 = data.area_ha * 10_000
 
-    # 2. Grade de elevação real (SRTM via OpenTopoData)
-    elevation_grid = await geo_service.get_elevation_grid(lat, lon, data.area_ha)
-
-    # 3. Métricas topográficas
-    topo_metrics = geo_service.analyze_topography(elevation_grid, area_m2=area_m2)
-
-    # 4. Insolação
-    solar = geo_service.get_solar_info(lat, topo_metrics["orientacao_predominante"])
-
-    # 5. Análise IA
-    terrain_ctx = {
-        "address": address_display,
-        "city": data.city, "state": data.state,
-        "area_ha": data.area_ha, "area_m2": area_m2,
-        "typology_intent": data.typology_intent or project.typology,
-        "vegetacao": data.vegetacao, "acesso": data.acesso,
-        "infraestrutura": data.infraestrutura,
-        "zoneamento": data.zoneamento,
-    }
-    ia_result = await ai_engine.analisar_terreno(terrain_ctx, topo_metrics)
-
-    # 6. Imagens
-    img_topo = chart_service.gerar_mapa_topografico(elevation_grid, topo_metrics, data.area_ha)
-    img_zonas = chart_service.gerar_grafico_zonas(topo_metrics["zonas"])
-
-    # 7. Salvar no banco
     terrain_db = db.query(Terrain).filter(Terrain.project_id == data.project_id).first()
     if not terrain_db:
         terrain_db = Terrain(project_id=data.project_id)
         db.add(terrain_db)
 
-    terrain_db.address = address_display
-    terrain_db.city = data.city
-    terrain_db.state = data.state
+    terrain_db.address = address_display or data.address
+    terrain_db.city = city
+    terrain_db.state = state
     terrain_db.lat = lat
     terrain_db.lon = lon
     terrain_db.area_ha = data.area_ha
@@ -102,7 +78,70 @@ async def analyze_terrain(data: TerrainInput, db: Session = Depends(get_db)):
     terrain_db.infraestrutura = data.infraestrutura
     terrain_db.zoneamento = data.zoneamento
     terrain_db.notas = data.notas
+    db.commit()
 
+    return {
+        "status": "saved",
+        "lat": lat,
+        "lon": lon,
+        "address": terrain_db.address,
+        "area_ha": data.area_ha,
+        "area_m2": area_m2,
+    }
+
+
+@router.post("/analyze")
+async def analyze_terrain(data: TerrainAnalyze, db: Session = Depends(get_db)):
+    """
+    Passo 2: busca elevacao real + analise por IA.
+    Mais lento (~30s), requer maxDuration:60 no Vercel Pro.
+    """
+    project = db.query(Project).filter(Project.id == data.project_id).first()
+    if not project:
+        raise HTTPException(404, "Projeto nao encontrado")
+
+    terrain_db = db.query(Terrain).filter(Terrain.project_id == data.project_id).first()
+    if not terrain_db:
+        raise HTTPException(400, "Salve os dados do terreno primeiro")
+    if not terrain_db.lat:
+        raise HTTPException(400, "Coordenadas nao encontradas. Informe endereco ou clique no mapa.")
+
+    lat, lon = terrain_db.lat, terrain_db.lon
+    area_m2 = terrain_db.area_m2 or (terrain_db.area_ha * 10_000)
+
+    # Grade de elevacao (SRTM via OpenTopoData, fallback sintetico)
+    elevation_grid = await geo_service.get_elevation_grid(lat, lon, terrain_db.area_ha)
+
+    # Metricas topograficas
+    topo_metrics = geo_service.analyze_topography(elevation_grid, area_m2=area_m2)
+
+    # Insolacao
+    solar = geo_service.get_solar_info(lat, topo_metrics["orientacao_predominante"])
+
+    # Contexto para IA
+    terrain_ctx = {
+        "address": terrain_db.address,
+        "city": terrain_db.city,
+        "state": terrain_db.state,
+        "area_ha": terrain_db.area_ha,
+        "area_m2": area_m2,
+        "typology_intent": terrain_db.notas or project.typology,
+        "vegetacao": terrain_db.vegetacao,
+        "acesso": terrain_db.acesso,
+        "infraestrutura": terrain_db.infraestrutura or [],
+        "zoneamento": terrain_db.zoneamento,
+    }
+    ia_result = await ai_engine.analisar_terreno(terrain_ctx, topo_metrics)
+
+    # Converter grade para formato do chart_service
+    n = elevation_grid["n"]
+    flat_elevations = [val for row in elevation_grid["elevations"] for val in row]
+    chart_grid = {"rows": n, "cols": n, "data": flat_elevations}
+
+    img_topo = chart_service.gerar_mapa_topografico(chart_grid, topo_metrics, terrain_db.area_ha)
+    img_zonas = chart_service.gerar_grafico_zonas(topo_metrics["zonas"])
+
+    # Salvar topografia
     topo_db = db.query(Topography).filter(Topography.project_id == data.project_id).first()
     if not topo_db:
         topo_db = Topography(project_id=data.project_id)
@@ -125,15 +164,15 @@ async def analyze_terrain(data: TerrainInput, db: Session = Depends(get_db)):
     topo_db.pontos_fortes = ia_result.get("pontos_fortes")
     topo_db.restricoes = ia_result.get("restricoes")
     topo_db.recomendacoes = ia_result.get("recomendacoes")
-
     db.commit()
 
     return {
         "status": "ok",
         "terrain": {
             "lat": lat, "lon": lon,
-            "address": address_display,
-            "area_ha": data.area_ha, "area_m2": area_m2,
+            "address": terrain_db.address,
+            "area_ha": terrain_db.area_ha,
+            "area_m2": area_m2,
         },
         "topography": {
             **topo_metrics,
@@ -150,7 +189,7 @@ def get_terrain(project_id: int, db: Session = Depends(get_db)):
     t = db.query(Terrain).filter(Terrain.project_id == project_id).first()
     topo = db.query(Topography).filter(Topography.project_id == project_id).first()
     if not t:
-        raise HTTPException(404, "Terreno não cadastrado")
+        raise HTTPException(404, "Terreno nao cadastrado")
     return {
         "terrain": {k: v for k, v in t.__dict__.items() if not k.startswith("_")},
         "topography": {k: v for k, v in topo.__dict__.items() if not k.startswith("_")} if topo else None,
