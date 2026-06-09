@@ -228,8 +228,8 @@ def get_elevation(project_id: int, db: Session = Depends(get_db)):
     return {
         "elevation_grid": elevation_grid,
         "area_ha": terrain.area_ha if terrain else None,
-        "lat_center": terrain.latitude if terrain else None,
-        "lon_center": terrain.longitude if terrain else None,
+        "lat_center": terrain.lat if terrain else None,
+        "lon_center": terrain.lon if terrain else None,
         "lotes": lotes,
         "num_lotes": imp.num_lotes if imp else 0,
         "area_media_lote": imp.area_media_lote if imp else 0,
