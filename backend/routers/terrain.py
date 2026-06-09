@@ -215,14 +215,11 @@ def get_elevation(project_id: int, db: Session = Depends(get_db)):
                 elevation_grid = None
 
         lotes = []
-        if imp and imp.layout_geojson:
+        if imp and imp.lotes:
             try:
-                layout = _json.loads(imp.layout_geojson) if isinstance(imp.layout_geojson, str) else imp.layout_geojson
-                features = layout.get("features", []) if isinstance(layout, dict) else []
-                for f in features:
-                    props = f.get("properties", {})
-                    geom = f.get("geometry", {})
-                    lotes.append({"tipo": props.get("tipo", "lote"), "geometry": geom, "area": props.get("area", 0)})
+                raw = _json.loads(imp.lotes) if isinstance(imp.lotes, str) else imp.lotes
+                if isinstance(raw, list):
+                    lotes = [{"tipo": l.get("tipo", "lote"), "area": l.get("area", 0)} for l in raw if isinstance(l, dict)]
             except Exception:
                 lotes = []
 
