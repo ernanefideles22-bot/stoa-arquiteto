@@ -280,9 +280,12 @@ textarea{resize:vertical;min-height:72px;}
               <textarea id="terrainNotes" placeholder="Zoneamento municipal, restrições conhecidas, observações..."></textarea>
             </div>
           </div>
-          <div style="margin-top:16px">
+          <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="saveTerrain()" id="btnSaveTerrain">
+              💾 Salvar e Localizar
+            </button>
             <button class="btn btn-primary" onclick="analyzeTerrain()" id="btnAnalyzeTerrain">
-              🔍 Analisar Terreno com IA
+              🤖 Analisar com IA
             </button>
           </div>
         </div>
@@ -579,29 +582,49 @@ function showTab(name) {
   document.querySelector(`[data-tab="${name}"]`).classList.add('active');
   document.getElementById(`panel-${name}`).classList.add('active');
   if (name === 'topography' && currentProject?.has_topography) loadTopography();
+  if (name === 'terrain' && currentProject?.has_terrain) loadTerrainForm();
+}
+
+async function loadTerrainForm() {
+  if (!currentProject) return;
+  try {
+    const res = await fetch(`${API}/api/terrain/${currentProject.id}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const t = data.terrain;
+    if (!t) return;
+    document.getElementById('terrainAddress').value = t.address || '';
+    document.getElementById('terrainCity').value = t.city || '';
+    document.getElementById('terrainState').value = t.state || '';
+    document.getElementById('terrainLat').value = t.lat || '';
+    document.getElementById('terrainLon').value = t.lon || '';
+    document.getElementById('terrainArea').value = t.area_ha || '';
+    if (t.topografia) document.getElementById('terrainTopo').value = t.topografia;
+    if (t.vegetacao) document.getElementById('terrainVeg').value = t.vegetacao;
+    if (t.acesso) document.getElementById('terrainAcesso').value = t.acesso;
+    if (t.zoneamento) document.getElementById('terrainNotes').value = t.zoneamento;
+    const infra = t.infraestrutura || [];
+    document.querySelectorAll('.infra-cb').forEach(cb => {
+      cb.checked = infra.includes(cb.value);
+    });
+    if (t.lat && t.lon) {
+      _placeMapMarker(t.lat, t.lon, t.address, t.area_m2);
+    }
+  } catch(e) {}
 }
 
 // ── TERRAIN ──────────────────────────────────────────────────────────────
 
-async function analyzeTerrain() {
-  if (!currentProject) { alert('Selecione um projeto primeiro'); return; }
-  const area = parseFloat(document.getElementById('terrainArea').value);
-  if (!area) { alert('Informe a área do terreno'); return; }
-
-  const btn = document.getElementById('btnAnalyzeTerrain');
-  btn.textContent = '⏳ Analisando...';
-  btn.disabled = true;
-
+function _getTerrainPayload() {
   const infra = [...document.querySelectorAll('.infra-cb:checked')].map(c => c.value);
-
-  const payload = {
+  return {
     project_id: currentProject.id,
     address: document.getElementById('terrainAddress').value,
     city: document.getElementById('terrainCity').value,
     state: document.getElementById('terrainState').value,
     lat: parseFloat(document.getElementById('terrainLat').value) || null,
     lon: parseFloat(document.getElementById('terrainLon').value) || null,
-    area_ha: area,
+    area_ha: parseFloat(document.getElementById('terrainArea').value) || 0,
     topografia: document.getElementById('terrainTopo').value,
     vegetacao: document.getElementById('terrainVeg').value,
     acesso: document.getElementById('terrainAcesso').value,
@@ -609,38 +632,95 @@ async function analyzeTerrain() {
     zoneamento: document.getElementById('terrainNotes').value,
     typology_intent: document.getElementById('terrainTypology').value,
   };
+}
+
+function _placeMapMarker(lat, lon, address, area_m2) {
+  if (!lat) return;
+  map.setView([lat, lon], 13);
+  if (marker) map.removeLayer(marker);
+  marker = L.marker([lat, lon]).addTo(map)
+            .bindPopup('📍 ' + (address || '')).openPopup();
+  if (area_m2) {
+    const raio = Math.sqrt(area_m2 / Math.PI);
+    L.circle([lat, lon], {
+      radius: raio, color: '#4fc3f7', fillColor:'#4fc3f7', fillOpacity:0.1, weight:2
+    }).addTo(map);
+  }
+}
+
+async function saveTerrain() {
+  if (!currentProject) { alert('Selecione um projeto primeiro'); return; }
+  const payload = _getTerrainPayload();
+  if (!payload.area_ha) { alert('Informe a área do terreno'); return; }
+
+  const btn = document.getElementById('btnSaveTerrain');
+  btn.textContent = '⏳ Salvando...';
+  btn.disabled = true;
 
   try {
-    const res = await fetch(`${API}/api/terrain/analyze`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+    const res = await fetch(`${API}/api/terrain/save`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-
-    if (data.terrain?.lat) {
-      map.setView([data.terrain.lat, data.terrain.lon], 13);
-      if (marker) map.removeLayer(marker);
-      marker = L.marker([data.terrain.lat, data.terrain.lon]).addTo(map)
-                .bindPopup(`📍 ${data.terrain.address}`).openPopup();
-      // Círculo aproximado da área
-      const raio = Math.sqrt(data.terrain.area_m2 / Math.PI);
-      L.circle([data.terrain.lat, data.terrain.lon], {
-        radius: raio, color: '#4fc3f7', fillColor:'#4fc3f7', fillOpacity:0.1, weight:2
-      }).addTo(map);
-    }
-
-    // Mostrar resultados na aba topografia
-    renderTopographyResults(data);
+    _placeMapMarker(data.lat, data.lon, data.address, data.area_m2);
     await loadProjects();
-    if (currentProject) { const r = await fetch(`${API}/api/projects/${currentProject.id}`); currentProject = await r.json(); renderOverview(); }
-    showTab('topography');
+    if (currentProject) {
+      const r = await fetch(`${API}/api/projects/${currentProject.id}`);
+      currentProject = await r.json();
+      renderOverview();
+    }
+    btn.textContent = '✅ Salvo!';
+    setTimeout(() => { btn.textContent = '💾 Salvar e Localizar'; }, 2000);
+  } catch(e) {
+    alert('Erro ao salvar: ' + e.message);
+    btn.textContent = '💾 Salvar e Localizar';
+  }
+  btn.disabled = false;
+}
 
+async function analyzeTerrain() {
+  if (!currentProject) { alert('Selecione um projeto primeiro'); return; }
+
+  const payload = _getTerrainPayload();
+  if (!payload.area_ha) { alert('Informe a área do terreno'); return; }
+
+  const btn = document.getElementById('btnAnalyzeTerrain');
+  btn.textContent = '⏳ Salvando terreno...';
+  btn.disabled = true;
+
+  try {
+    const saveRes = await fetch(`${API}/api/terrain/save`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const saveData = await saveRes.json();
+    _placeMapMarker(saveData.lat, saveData.lon, saveData.address, saveData.area_m2);
+
+    btn.textContent = '🤖 Analisando com IA (~30s)...';
+    const analyzeRes = await fetch(`${API}/api/terrain/analyze`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({project_id: currentProject.id})
+    });
+    const data = await analyzeRes.json();
+
+    if (data.status === 'ok') {
+      renderTopographyResults(data);
+      await loadProjects();
+      if (currentProject) {
+        const r = await fetch(`${API}/api/projects/${currentProject.id}`);
+        currentProject = await r.json();
+        renderOverview();
+      }
+      showTab('topography');
+    } else {
+      alert('Erro na análise: ' + (data.detail || JSON.stringify(data)));
+    }
   } catch(e) {
     alert('Erro na análise: ' + e.message);
   }
 
-  btn.textContent = '🔍 Analisar Terreno com IA';
+  btn.textContent = '🤖 Analisar com IA';
   btn.disabled = false;
 }
 
