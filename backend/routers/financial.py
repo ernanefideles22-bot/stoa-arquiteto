@@ -61,29 +61,36 @@ async def analyze_financial(data: FinancialRequest, db: Session = Depends(get_db
 
     result = await ai_engine.calcular_viabilidade(terrain_ctx, imp_ctx, arch_ctx, data.cenario)
 
+    custos = result.get("custos", {})
+    receitas = result.get("receitas", {})
+    resultado = result.get("resultado", {})
+
     # Sobrescrever custo terreno se fornecido
-    if data.custo_terreno > 0 and "custos" in result:
-        result["custos"]["terreno"] = data.custo_terreno
-        total = sum(v for k, v in result["custos"].items() if k != "total" and isinstance(v, (int, float)))
-        result["custos"]["total"] = total
-        result["resultado"]["lucro_bruto"] = result["receitas"].get("vgv_total", 0) - total
-        if result["receitas"].get("vgv_total", 0) > 0:
-            result["resultado"]["margem_bruta_percent"] = round(
-                result["resultado"]["lucro_bruto"] / result["receitas"]["vgv_total"] * 100, 1
+    if data.custo_terreno and data.custo_terreno > 0:
+        custos["terreno"] = data.custo_terreno
+        total = sum(v for k, v in custos.items() if k not in ("total", "contingencia_percent") and isinstance(v, (int, float)))
+        custos["total"] = total
+        resultado["lucro_bruto"] = receitas.get("vgv_total", 0) - total
+        if receitas.get("vgv_total", 0) > 0:
+            resultado["margem_bruta_percent"] = round(
+                resultado["lucro_bruto"] / receitas["vgv_total"] * 100, 1
             )
 
-    # Gerar gráfico
-    img_financeiro = chart_service.gerar_grafico_financeiro(result)
+    # Gerar gráfico — passar dict com as chaves que chart_service espera
+    chart_input = {
+        "custo_total": custos.get("total", 0),
+        "vgv": receitas.get("vgv_total", 0),
+        "lucro_bruto": resultado.get("lucro_bruto", 0),
+        "margem_bruta": resultado.get("margem_bruta_percent", 0),
+        "roi": resultado.get("roi_percent", 0),
+    }
+    img_financeiro = chart_service.gerar_grafico_financeiro(chart_input)
 
     # Salvar
     fin = db.query(Financial).filter(Financial.project_id == data.project_id).first()
     if not fin:
         fin = Financial(project_id=data.project_id)
         db.add(fin)
-
-    custos = result.get("custos", {})
-    receitas = result.get("receitas", {})
-    resultado = result.get("resultado", {})
 
     fin.custo_terreno          = custos.get("terreno", data.custo_terreno)
     fin.custo_infraestrutura   = custos.get("infraestrutura_loteamento")
