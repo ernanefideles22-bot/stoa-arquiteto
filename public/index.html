@@ -180,7 +180,8 @@ textarea{resize:vertical;min-height:72px;}
       <div class="tab" data-tab="topography" onclick="showTab('topography')">⛰️ Topografia</div>
       <div class="tab" data-tab="implantation" onclick="showTab('implantation')">🗺️ Implantação</div>
       <div class="tab" data-tab="financial" onclick="showTab('financial')">💰 Viabilidade</div>
-      <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');init3D()">🎯 3D</div>
+      <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');load3DScene()">🎯 3D</div>
+      <div class="tab" data-tab="relatorio" onclick="showTab('relatorio')">📄 Relatório</div>
     </nav>
 
     <!-- PANELS -->
@@ -407,6 +408,16 @@ textarea{resize:vertical;min-height:72px;}
             Arraste para rotacionar • Scroll para zoom
           </p>
         </div>
+      </div>
+
+      <!-- RELATÓRIO -->
+      <div class="panel" id="panel-relatorio">
+        <div class="card">
+          <div class="card-title"><span>📄</span> Relatório de Viabilidade</div>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Gera relatório completo com resumo executivo IA e PDF para download.</p>
+          <button class="btn btn-primary" onclick="generateReport()" id="btnReport">📄 Gerar Relatório com IA</button>
+        </div>
+        <div id="reportResults"></div>
       </div>
 
     </div><!-- /panels -->
@@ -1025,8 +1036,8 @@ function init3D() {
   // Grid
   scene3D.add(new THREE.GridHelper(60, 30, 0x1e2340, 0x1e2340));
 
-  // Exemplo: terreno + volumes
-  _add3DExample();
+  // Load real terrain or fallback
+  _doLoad3D();
 
   // Mouse rotate
   let isDragging = false, prevX, prevY;
@@ -1048,28 +1059,88 @@ function init3D() {
   animate();
 }
 
-function _add3DExample() {
-  // Plataforma (terreno)
-  const geo = new THREE.BoxGeometry(40, 1, 30);
-  const mat = new THREE.MeshLambertMaterial({color: 0x4a5c3a});
-  const terrain = new THREE.Mesh(geo, mat);
-  terrain.position.y = -0.5;
-  scene3D.add(terrain);
+function load3DScene() {
+  if (!renderer3D) init3D();
+  else {
+    // Clear meshes
+    const rem = [];
+    scene3D.children.forEach(c => { if (c instanceof THREE.Mesh || c instanceof THREE.LineSegments) rem.push(c); });
+    rem.forEach(c => scene3D.remove(c));
+    _doLoad3D();
+  }
+}
 
-  // Volumes de lotes
+function _doLoad3D() {
+  if (!currentProject) { _add3DExample(); return; }
+  fetch(API + '/api/terrain/' + currentProject.id + '/elevation')
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (data && data.elevation_grid && data.elevation_grid.elevations) {
+        _buildRealTerrain(data);
+      } else { _add3DExample(); }
+    })
+    .catch(() => _add3DExample());
+}
+
+function _buildRealTerrain(data) {
+  const grid = data.elevation_grid;
+  const elevations = grid.elevations;
+  const n = grid.n || elevations.length;
+  const SIZE = 50;
+  const flat = [].concat(...elevations);
+  const minE = Math.min.apply(null, flat);
+  const maxE = Math.max.apply(null, flat);
+  const range = maxE - minE || 1;
+  const scale = 8;
+
+  const geo = new THREE.PlaneGeometry(SIZE, SIZE, n - 1, n - 1);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  for (let row = 0; row < n; row++) {
+    for (let col = 0; col < n; col++) {
+      const idx = row * n + col;
+      const elev = Array.isArray(elevations[row]) ? elevations[row][col] : flat[idx];
+      pos.setY(idx, ((elev - minE) / range) * scale);
+    }
+  }
+  geo.computeVertexNormals();
+  scene3D.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color: 0x4a7c4e})));
+  scene3D.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color: 0x2d4a2d, wireframe:true, opacity:0.15, transparent:true})));
+
+  const numLotes = Math.min(data.num_lotes || 0, 40);
+  if (numLotes > 0) {
+    const avgH = scale * 0.5;
+    const colors = [0x4fc3f7, 0x81d4fa, 0x7c4dff, 0x29b6f6];
+    const cols = Math.ceil(Math.sqrt(numLotes));
+    const sp = SIZE / (cols + 1);
+    for (let i = 0; i < numLotes; i++) {
+      const r2 = Math.floor(i / cols), c2 = i % cols;
+      const lh = 1.5 + Math.random() * 1.5;
+      const g = new THREE.BoxGeometry(sp * 0.65, lh, sp * 0.65);
+      const m = new THREE.MeshLambertMaterial({color: colors[i % colors.length], transparent:true, opacity:0.85});
+      const box = new THREE.Mesh(g, m);
+      box.position.set(-SIZE/2 + sp * (c2+1), avgH + lh/2, -SIZE/2 + sp * (r2+1));
+      scene3D.add(box);
+      const el = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({color:0x000000, opacity:0.3, transparent:true}));
+      el.position.copy(box.position);
+      scene3D.add(el);
+    }
+  }
+}
+
+function _add3DExample() {
+  const geo = new THREE.BoxGeometry(40, 1, 30);
+  scene3D.add(Object.assign(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color: 0x4a5c3a})), {position: new THREE.Vector3(0,-0.5,0)}));
   const colors = [0x4fc3f7, 0x81d4fa, 0x29b6f6, 0x039be5];
   for (let i = 0; i < 8; i++) {
     const h = 2 + Math.random() * 4;
     const g = new THREE.BoxGeometry(3, h, 4);
-    const m = new THREE.MeshLambertMaterial({color: colors[i % colors.length], transparent:true, opacity:.85});
-    const mesh = new THREE.Mesh(g, m);
-    mesh.position.set(-14 + (i % 4) * 8, h/2, -6 + Math.floor(i/4) * 10);
+    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({color: colors[i%colors.length], transparent:true, opacity:.85}));
+    mesh.position.set(-14 + (i%4)*8, h/2, -6 + Math.floor(i/4)*10);
     scene3D.add(mesh);
-    // Borda
-    const edges = new THREE.EdgesGeometry(g);
-    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x000000, opacity:.3, transparent:true}));
-    line.position.copy(mesh.position);
-    scene3D.add(line);
+    const el = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({color:0x000000, opacity:.3, transparent:true}));
+    el.position.copy(mesh.position);
+    scene3D.add(el);
   }
 }
 
@@ -1082,6 +1153,41 @@ function reset3D() {
   scene3D.rotation.set(0, 0, 0);
   camera3D.position.set(30, 25, 30);
   camera3D.lookAt(0, 0, 0);
+}
+
+// ── RELATÓRIO ───────────────────────────────────────────────────────────
+
+async function generateReport() {
+  if (!currentProject) { alert('Selecione um projeto'); return; }
+  const btn = document.getElementById('btnReport');
+  btn.textContent = '⏳ Gerando com IA...';
+  btn.disabled = true;
+  try {
+    const res = await fetch(API + '/api/report/generate', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({project_id: currentProject.id})
+    });
+    const data = await res.json();
+    if (res.ok) { renderReportResults(data); }
+    else { alert('Erro: ' + (data.detail || JSON.stringify(data))); }
+  } catch(e) { alert('Erro: ' + e.message); }
+  btn.textContent = '📄 Gerar Relatório com IA';
+  btn.disabled = false;
+}
+
+function renderReportResults(data) {
+  const pdfUrl = data.pdf_base64 ? 'data:application/pdf;base64,' + data.pdf_base64 : null;
+  const labels = ['Terreno','Topografia','Implantação','Financeiro'];
+  const keys = ['has_terrain','has_topo','has_implantacao','has_financeiro'];
+  const tags = labels.map((l,i) => '<span class="tag ' + (data[keys[i]] ? 'tag-good' : 'tag-warn') + '">' + (data[keys[i]] ? '✓' : '—') + ' ' + l + '</span>').join('');
+  document.getElementById('reportResults').innerHTML =
+    '<div class="card"><div class="card-title"><span>📋</span> Resumo Executivo</div>' +
+    '<div style="background:#0d0f1a;border-radius:8px;padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap">' + (data.resumo_executivo || '—') + '</div></div>' +
+    '<div class="card"><div class="card-title"><span>📦</span> Módulos incluídos</div><div class="tag-list">' + tags + '</div></div>' +
+    (pdfUrl ? '<div class="card"><div class="card-title"><span>📥</span> Download PDF</div>' +
+    '<a href="' + pdfUrl + '" download="relatorio-' + (currentProject ? currentProject.name.replace(/[^a-z0-9]/gi,'-') : 'projeto') + '.pdf"' +
+    ' style="display:inline-block;padding:10px 24px;background:var(--accent);color:#000;border-radius:6px;font-weight:700;text-decoration:none;font-size:13px">⬇ Baixar PDF</a>' +
+    '<p style="font-size:11px;color:var(--text2);margin-top:8px">Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</p></div>' : '');
 }
 
 // ── MODAL new project ─────────────────────────────────────────────────────
