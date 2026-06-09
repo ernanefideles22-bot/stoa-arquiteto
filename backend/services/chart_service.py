@@ -168,3 +168,4 @@ def gerar_grafico_zonas(zonas: list) -> str:
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">
   <rect width="100%" height="100%" fill="{DARK_BG}"/>
   <text x="{W//2}" y="22" text-anchor="middle" fill="{TEXT_CLR}" font-family="sans-serif" font-size="13" font-weight
+
