@@ -1,195 +1,170 @@
 """
-Gerador de gráficos e mapas — STOA Civil
-Produz imagens base64 para o frontend e para o PDF.
+Gerador de grÃ¡ficos e mapas â STOA Civil
+Gera SVGs puros (sem matplotlib/scipy/Pillow) para reduzir bundle no Vercel.
 """
 import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import matplotlib.colors as mcolors
-from matplotlib.patches import FancyArrowPatch
-from io import BytesIO
 import base64
 import math
 
 
-DARK_BG   = "#0f1117"
-PANEL_BG  = "#1a1d27"
-TEXT_CLR  = "#e0e0e0"
-GRID_CLR  = "#2a2d3a"
-ACCENT    = "#4fc3f7"
+# ââ Paletas âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+DARK_BG  = "#0f1117"
+PANEL_BG = "#1a1d27"
+TEXT_CLR = "#e0e0e0"
+GRID_CLR = "#2a2d3a"
+ACCENT   = "#4fc3f7"
+
+SLOPE_COLORS = ["#2ecc71", "#f1c40f", "#e67e22", "#e74c3c", "#8e44ad"]
+SLOPE_LABELS = ["Plano 0-5%", "Suave 5-15%", "Moderado 15-30%", "Ingreme 30-45%", "Muito Ingreme >45%"]
 
 
-def fig_to_b64(fig) -> str:
-    buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=130, bbox_inches="tight",
-                facecolor=fig.get_facecolor())
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode()
+# ââ Helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+
+def _b64(svg: str) -> str:
+    """Converte SVG para data URI base64."""
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode()
 
 
-def gerar_mapa_topografico(elevation_grid: dict, topo_metrics: dict,
-                             area_ha: float) -> str:
-    """Gera mapa de curvas de nível + declividade lado a lado."""
+def _lerp_color(t: float, colors: list) -> str:
+    """Interpola entre uma lista de cores hex dado t em [0,1]."""
+    if not colors:
+        return "#888888"
+    t = max(0.0, min(1.0, t))
+    seg = len(colors) - 1
+    idx = int(t * seg)
+    idx = min(idx, seg - 1)
+    t2 = t * seg - idx
+    c1 = colors[idx]
+    c2 = colors[idx + 1]
+    r = int(int(c1[1:3], 16) * (1 - t2) + int(c2[1:3], 16) * t2)
+    g = int(int(c1[3:5], 16) * (1 - t2) + int(c2[3:5], 16) * t2)
+    b = int(int(c1[5:7], 16) * (1 - t2) + int(c2[5:7], 16) * t2)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+TERRAIN_PALETTE = ["#1a5276", "#1e8449", "#f4d03f", "#ca6f1e", "#784212", "#f0f3f4"]
+
+
+def _slope_color(slope_pct: float) -> str:
+    if slope_pct < 5:   return SLOPE_COLORS[0]
+    if slope_pct < 15:  return SLOPE_COLORS[1]
+    if slope_pct < 30:  return SLOPE_COLORS[2]
+    if slope_pct < 45:  return SLOPE_COLORS[3]
+    return SLOPE_COLORS[4]
+
+
+# ââ Mapa TopogrÃ¡fico (heatmap elevaÃ§Ã£o + declividade) ââââââââââââââââââââââââ
+
+def gerar_mapa_topografico(elevation_grid: dict, topo_metrics: dict, area_ha: float) -> str:
     Z = np.array(elevation_grid["elevations"])
     n = elevation_grid["n"]
-    res = elevation_grid["resolution_m"]
+    res = elevation_grid.get("resolution_m", 100)
 
-    x = np.arange(n) * res / 1000  # km
-    y = np.arange(n) * res / 1000
-    X, Y = np.meshgrid(x, y)
+    W, H = 560, 280   # Ã¡rea do mapa (cada painel)
+    PAD  = 40
+    FULL_W = W * 2 + PAD * 3
+    FULL_H = H + PAD * 2 + 30 + 20   # +tÃ­tulo +legenda
 
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6.5))
-    fig.patch.set_facecolor(DARK_BG)
-    fig.suptitle(f"Análise Topográfica — {area_ha:.0f} ha", color=TEXT_CLR,
-                 fontsize=14, fontweight="bold", y=1.01)
+    z_min, z_max = float(Z.min()), float(Z.max())
+    cell_w = W / n
+    cell_h = H / n
 
-    # ── Curvas de nível ──
-    ax1 = axes[0]
-    ax1.set_facecolor(PANEL_BG)
-    levels = np.linspace(Z.min(), Z.max(), 16)
-    cf = ax1.contourf(X, Y, Z, levels=levels, cmap="terrain", alpha=0.9)
-    cs = ax1.contour(X, Y, Z, levels=levels[::2], colors="white",
-                     linewidths=0.7, alpha=0.6)
-    ax1.clabel(cs, inline=True, fontsize=7, fmt="%.0fm", colors="white")
-    cb = plt.colorbar(cf, ax=ax1, shrink=0.85, pad=0.02)
-    cb.set_label("Elevação (m)", color=TEXT_CLR, fontsize=9)
-    cb.ax.yaxis.set_tick_params(color=TEXT_CLR)
-    plt.setp(cb.ax.yaxis.get_ticklabels(), color=TEXT_CLR)
+    dzdx = np.gradient(Z, axis=1) / max(res, 1)
+    dzdy = np.gradient(Z, axis=0) / max(res, 1)
+    slope = np.sqrt(dzdx ** 2 + dzdy ** 2) * 100
 
-    _style_axis(ax1, "Topografia — Curvas de Nível", "Distância L-O (km)", "Distância N-S (km)")
-    _rosa_ventos(ax1, 0.92, 0.92)
+    rects_elev = []
+    rects_slope = []
+    for i in range(n):
+        for j in range(n):
+            x = PAD + j * cell_w
+            y = PAD + 30 + i * cell_h
+            t = (float(Z[i, j]) - z_min) / (z_max - z_min + 1e-9)
+            c_elev  = _lerp_color(t, TERRAIN_PALETTE)
+            c_slope = _slope_color(float(slope[i, j]))
+            rects_elev.append(
+                f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_w:.1f}" height="{cell_h:.1f}" fill="{c_elev}"/>'
+            )
+            x2 = PAD * 2 + W + j * cell_w
+            rects_slope.append(
+                f'<rect x="{x2:.1f}" y="{y:.1f}" width="{cell_w:.1f}" height="{cell_h:.1f}" fill="{c_slope}"/>'
+            )
 
-    # ── Declividade ──
-    ax2 = axes[1]
-    ax2.set_facecolor(PANEL_BG)
-    dzdx = np.gradient(Z, axis=1) / res
-    dzdy = np.gradient(Z, axis=0) / res
-    slope = np.sqrt(dzdx**2 + dzdy**2) * 100
+    # Legendas de declividade
+    leg_y = PAD + 30 + H + 8
+    legend_items = []
+    for k, (c, lbl) in enumerate(zip(SLOPE_COLORS, SLOPE_LABELS)):
+        lx = PAD * 2 + W + k * 110
+        legend_items.append(
+            f'<rect x="{lx}" y="{leg_y}" width="12" height="12" fill="{c}"/>'
+            f'<text x="{lx+16}" y="{leg_y+10}" fill="{TEXT_CLR}" font-size="9">{lbl}</text>'
+        )
 
-    bounds = [0, 5, 15, 30, 45, 200]
-    colors_slope = ["#2ecc71", "#f1c40f", "#e67e22", "#e74c3c", "#8e44ad"]
-    cmap = mcolors.ListedColormap(colors_slope)
-    norm = mcolors.BoundaryNorm(bounds, cmap.N)
-    sm = ax2.contourf(X, Y, slope, levels=bounds, cmap=cmap, norm=norm, alpha=0.9)
+    info = (f"Alt min={z_min:.0f}m | max={z_max:.0f}m | "
+            f"Desnivel={topo_metrics.get('desnivel','?')}m | "
+            f"Decl.media={topo_metrics.get('decl_media','?')}%")
 
-    patches = [
-        mpatches.Patch(color=colors_slope[0], label="Plano 0–5%"),
-        mpatches.Patch(color=colors_slope[1], label="Suave 5–15%"),
-        mpatches.Patch(color=colors_slope[2], label="Moderado 15–30%"),
-        mpatches.Patch(color=colors_slope[3], label="Íngreme 30–45%"),
-        mpatches.Patch(color=colors_slope[4], label="Muito Íngreme >45%"),
-    ]
-    ax2.legend(handles=patches, loc="lower right", fontsize=8,
-               facecolor=PANEL_BG, labelcolor=TEXT_CLR, framealpha=0.9,
-               edgecolor=GRID_CLR)
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{FULL_W}" height="{FULL_H}" viewBox="0 0 {FULL_W} {FULL_H}">
+  <rect width="100%" height="100%" fill="{DARK_BG}"/>
+  <text x="{FULL_W//2}" y="22" text-anchor="middle" fill="{TEXT_CLR}" font-family="sans-serif" font-size="13" font-weight="bold">Analise Topografica â {area_ha:.0f} ha</text>
+  <text x="{PAD + W//2}" y="{PAD+24}" text-anchor="middle" fill="{TEXT_CLR}" font-family="sans-serif" font-size="10">Elevacao (m)</text>
+  <text x="{PAD*2 + W + W//2}" y="{PAD+24}" text-anchor="middle" fill="{TEXT_CLR}" font-family="sans-serif" font-size="10">Declividade (%)</text>
+  {"".join(rects_elev)}
+  {"".join(rects_slope)}
+  <rect x="{PAD}" y="{PAD+30}" width="{W}" height="{H}" fill="none" stroke="{GRID_CLR}" stroke-width="1"/>
+  <rect x="{PAD*2+W}" y="{PAD+30}" width="{W}" height="{H}" fill="none" stroke="{GRID_CLR}" stroke-width="1"/>
+  {"".join(legend_items)}
+  <text x="{FULL_W//2}" y="{FULL_H-4}" text-anchor="middle" fill="{ACCENT}" font-family="sans-serif" font-size="9">{info}</text>
+</svg>"""
 
-    _style_axis(ax2, "Mapa de Declividade", "Distância L-O (km)", "")
+    return _b64(svg)
 
-    # Métricas
-    info = (f"Δh={topo_metrics['desnivel']}m | "
-            f"D.média={topo_metrics['decl_media']}% | "
-            f"Útil={topo_metrics['area_util_m2']/10000:.1f}ha")
-    fig.text(0.5, -0.02, info, ha="center", color=ACCENT, fontsize=10)
 
-    plt.tight_layout(pad=1.5)
-    return fig_to_b64(fig)
-
+# ââ GrÃ¡fico de Pizza â Zonas de Declividade ââââââââââââââââââââââââââââââââââ
 
 def gerar_grafico_zonas(zonas: list) -> str:
-    """Gráfico de pizza das zonas de declividade."""
-    fig, ax = plt.subplots(figsize=(7, 5))
-    fig.patch.set_facecolor(DARK_BG)
-    ax.set_facecolor(DARK_BG)
+    zonas_validas = [z for z in zonas if z.get("percentual", 0) > 0]
+    if not zonas_validas:
+        return _b64(f'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="100%" height="100%" fill="{DARK_BG}"/><text x="200" y="150" text-anchor="middle" fill="{TEXT_CLR}" font-family="sans-serif">Sem dados</text></svg>')
 
-    labels  = [z["tipo"] for z in zonas if z["percentual"] > 0]
-    values  = [z["percentual"] for z in zonas if z["percentual"] > 0]
-    colors  = ["#2ecc71", "#f1c40f", "#e67e22", "#e74c3c", "#8e44ad"][:len(labels)]
+    W, H = 500, 340
+    cx, cy, r = 180, 170, 130
 
-    wedges, texts, autotexts = ax.pie(
-        values, labels=labels, colors=colors,
-        autopct="%1.1f%%", startangle=140,
-        textprops={"color": TEXT_CLR, "fontsize": 9},
-        wedgeprops={"edgecolor": DARK_BG, "linewidth": 2},
-    )
-    for at in autotexts:
-        at.set_color("white")
-        at.set_fontsize(9)
+    total = sum(z["percentual"] for z in zonas_validas)
+    angle = -math.pi / 2   # comeÃ§a em cima
 
-    ax.set_title("Distribuição de Declividade", color=TEXT_CLR,
-                 fontsize=12, pad=15, fontweight="bold")
-    plt.tight_layout()
-    return fig_to_b64(fig)
+    slices = []
+    legend_items = []
+    for k, z in enumerate(zonas_validas):
+        frac = z["percentual"] / total
+        da   = frac * 2 * math.pi
+        x1 = cx + r * math.cos(angle)
+        y1 = cy + r * math.sin(angle)
+        x2 = cx + r * math.cos(angle + da)
+        y2 = cy + r * math.sin(angle + da)
+        large = 1 if da > math.pi else 0
+        color = SLOPE_COLORS[k % len(SLOPE_COLORS)]
+        slices.append(
+            f'<path d="M{cx},{cy} L{x1:.2f},{y1:.2f} A{r},{r} 0 {large},1 {x2:.2f},{y2:.2f} Z" fill="{color}" stroke="{DARK_BG}" stroke-width="2"/>'
+        )
+        # percentual no centro do slice
+        mid_a = angle + da / 2
+        tx = cx + (r * 0.65) * math.cos(mid_a)
+        ty = cy + (r * 0.65) * math.sin(mid_a)
+        if frac > 0.05:
+            slices.append(
+                f'<text x="{tx:.1f}" y="{ty:.1f}" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="sans-serif" font-size="10" font-weight="bold">{z["percentual"]:.1f}%</text>'
+            )
+        # legenda
+        lx, ly = 340, 80 + k * 38
+        legend_items.append(
+            f'<rect x="{lx}" y="{ly}" width="14" height="14" fill="{color}"/>'
+            f'<text x="{lx+20}" y="{ly+11}" fill="{TEXT_CLR}" font-family="sans-serif" font-size="10">{z["tipo"]}</text>'
+            f'<text x="{lx+20}" y="{ly+22}" fill="#aaaaaa" font-family="sans-serif" font-size="9">{z["percentual"]:.1f}% â {z.get("area_m2",0):,.0f} mÂ²</text>'
+        )
+        angle += da
 
-
-def gerar_grafico_financeiro(financial: dict) -> str:
-    """Gráfico de barras de custos e fluxo de caixa."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.patch.set_facecolor(DARK_BG)
-
-    # ── Composição de custos ──
-    ax1 = axes[0]
-    ax1.set_facecolor(PANEL_BG)
-    custos = financial.get("custos", {})
-    items = {
-        "Terreno":       custos.get("terreno", 0),
-        "Infraestrutura":custos.get("infraestrutura_loteamento", 0),
-        "Construção":    custos.get("construcao", 0),
-        "Projetos":      custos.get("projetos_aprovacoes", 0),
-        "Marketing":     custos.get("marketing_vendas", 0),
-        "Financeiro":    custos.get("financeiro_juros", 0),
-    }
-    items = {k: v for k, v in items.items() if v > 0}
-    bars = ax1.barh(list(items.keys()), [v/1e6 for v in items.values()],
-                    color=ACCENT, alpha=0.85, edgecolor=DARK_BG)
-    ax1.bar_label(bars, fmt="R$ %.1fM", color=TEXT_CLR, fontsize=8, padding=3)
-    _style_axis(ax1, "Composição de Custos", "Milhões (R$)", "")
-    ax1.set_xlim(0, max(items.values()) / 1e6 * 1.3)
-
-    # ── Fluxo de caixa ──
-    ax2 = axes[1]
-    ax2.set_facecolor(PANEL_BG)
-    fluxo = financial.get("fluxo_caixa_anual", [])
-    if fluxo:
-        anos = [f["ano"] for f in fluxo]
-        invest = [-f.get("investimento", 0)/1e6 for f in fluxo]
-        receita = [f.get("receita", 0)/1e6 for f in fluxo]
-        saldo = [f.get("saldo_acumulado", 0)/1e6 for f in fluxo]
-
-        w = 0.35
-        x = np.arange(len(anos))
-        ax2.bar(x - w/2, invest,  w, label="Investimento", color="#e74c3c", alpha=0.8)
-        ax2.bar(x + w/2, receita, w, label="Receita",      color="#2ecc71", alpha=0.8)
-        ax2.plot(x, saldo, "o-", color=ACCENT, linewidth=2, label="Saldo Acum.", zorder=5)
-        ax2.axhline(0, color=GRID_CLR, linewidth=1)
-        ax2.set_xticks(x)
-        ax2.set_xticklabels([f"Ano {a}" for a in anos], color=TEXT_CLR, fontsize=8)
-        ax2.legend(facecolor=PANEL_BG, labelcolor=TEXT_CLR, fontsize=8,
-                   edgecolor=GRID_CLR)
-        _style_axis(ax2, "Fluxo de Caixa", "Milhões (R$)", "")
-
-    plt.tight_layout(pad=2)
-    return fig_to_b64(fig)
-
-
-def _style_axis(ax, title, xlabel, ylabel):
-    ax.set_title(title, color=TEXT_CLR, fontsize=11, fontweight="bold", pad=8)
-    ax.set_xlabel(xlabel, color=TEXT_CLR, fontsize=9)
-    ax.set_ylabel(ylabel, color=TEXT_CLR, fontsize=9)
-    ax.tick_params(colors=TEXT_CLR, labelsize=8)
-    for sp in ax.spines.values():
-        sp.set_color(GRID_CLR)
-    ax.yaxis.grid(True, color=GRID_CLR, linewidth=0.5, alpha=0.7)
-    ax.set_axisbelow(True)
-
-
-def _rosa_ventos(ax, xn, yn):
-    trans = ax.transAxes
-    ax.annotate("N", xy=(xn, yn + 0.05), xycoords=trans,
-                ha="center", va="center", fontsize=9,
-                color="white", fontweight="bold")
-    ax.annotate("", xy=(xn, yn + 0.03), xytext=(xn, yn - 0.03),
-                xycoords=trans, textcoords=trans,
-                arrowprops=dict(arrowstyle="-|>", color="white", lw=1.5))
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">
+  <rect width="100%" height="100%" fill="{DARK_BG}"/>
+  <text x="{W//2}" y="22" text-anchor="middle" fill="{TEXT_CLR}" font-family="sans-serif" font-size="13" font-weight
