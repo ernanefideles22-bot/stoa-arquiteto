@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .models.database import create_tables
-from .routers import projects, terrain, implantation, financial
+from .routers import projects, terrain, implantation, financial, report
 
 # Criar tabelas na inicialização (tolerante a falhas de conexão em serverless)
 try:
@@ -39,6 +39,7 @@ app.include_router(projects.router)
 app.include_router(terrain.router)
 app.include_router(implantation.router)
 app.include_router(financial.router)
+app.include_router(report.router)
 
 # Servir frontend
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
