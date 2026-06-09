@@ -7,32 +7,36 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./stoa_civil.db")
 
-# Configuracao adaptada para SQLite (local) e PohstgreSQL (Vercel/Supabase)
+# Configuracao adaptada para SQLite (local) e PostgreSQL (Vercel/Supabase)
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
     import re, ssl
-      # Usa pg8000 (pure Python) — evita problemas com psycopg2 no serverless
+    # Usa pg8000 (pure Python) como driver â evita problemas com psycopg2 no serverless
     url = DATABASE_URL
-      for prefix in ("postgresql://", "postgres://"):
-                if url.startswith(prefix):
-                              url = url.replace(prefix, "postgresql+pg8000://", 1)
-                              break
-                      ssl_required = bool(re.search(r"sslmode=(require|verify)", url))
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            url = url.replace(prefix, "postgresql+pg8000://", 1)
+            break
+
+    # Extrai sslmode do query string e configura via connect_args
+    ssl_required = bool(re.search(r"sslmode=(require|verify)", url))
     url = re.sub(r"[?&]sslmode=[^&]*", "", url).rstrip("?").rstrip("&")
+
     connect_args = {}
     if ssl_required:
-              ctx = ssl.create_default_context()
+        ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         connect_args["ssl_context"] = ctx
+
     engine = create_engine(
-              url,
-              connect_args=connect_args,
-              pool_pre_ping=True,
-              pool_size=5,
-              max_overflow=10,
-              pool_recycle=300,
+        url,
+        connect_args=connect_args,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=300,
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
