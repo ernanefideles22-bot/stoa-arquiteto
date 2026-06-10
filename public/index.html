@@ -1049,7 +1049,7 @@ async function generateReport() {
     if (data.pdf_base64) {
       const dlLink = document.getElementById('pdfDownload');
       dlLink.href = 'data:application/pdf;base64,' + data.pdf_base64;
-      dlLink.download = (currentProject.name || 'relatorio').replace(/[^a-zA-Z0-9]\/g,'_') + '.pdf';
+      dlLink.download = (currentProject.name || 'relatorio').replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
       dlLink.style.display = 'inline-block';
 
       document.getElementById('reportPreview').innerHTML = `
