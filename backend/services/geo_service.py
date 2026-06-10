@@ -190,3 +190,20 @@ def get_solar_info(lat: float, orientacao: str) -> dict:
     faces_sol = {
         "N":  "Recebe sol o dia todo (hemisferio sul)" if lat < 0 else "Pouca incidencia direta",
         "S":  "Pouca incidencia direta (hemisferio sul)" if lat < 0 else "Recebe sol o dia todo",
+        "L":  "Sol da manha - ideal para dormitorios",
+        "O":  "Sol da tarde - ideal para areas sociais",
+        "NE": "Sol manha/tarde - excelente para condominios",
+        "NO": "Sol tarde - bom para areas sociais",
+        "SE": "Sol manha - bom para dormitorios",
+        "SO": "Sol tarde - cuidado com superaquecimento",
+    }
+    return {
+        "hemisferio": hemisferio,
+        "orientacao": orientacao,
+        "descricao": faces_sol.get(orientacao, "Orientacao mista"),
+        "recomendacao_implantacao": (
+            "Posicionar frente dos lotes voltada para N ou NE"
+            if lat < 0 else
+            "Posicionar frente dos lotes voltada para S ou SE"
+        ),
+    }
