@@ -42,6 +42,20 @@ async def get_elevation_grid(lat: float, lon: float, area_ha: float) -> dict:
     Busca grade 20x20 de elevação real via OpenTopoData SRTM 30m.
     400 pontos = 4 lotes de 100 (respeita 1 req/s do free tier).
     """
+    # Rejeita coordenadas inválidas (ex: pixel values de clique antigo no mapa)
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        n = 20
+        lado_m = math.sqrt(area_ha * 10_000) * 1.4
+        res_m = int(lado_m * 2 / max(n - 1, 1))
+        safe_lats = np.linspace(-0.01, 0.01, n)
+        safe_lons = np.linspace(-0.01, 0.01, n)
+        return {
+            "lats": safe_lats.tolist(), "lons": safe_lons.tolist(),
+            "elevations": _synthetic_elevation(n, 0.0, 0.0, area_ha).tolist(),
+            "n": n, "resolution_m": res_m,
+            "lat_center": lat, "lon_center": lon,
+        }
+
     lado_m = math.sqrt(area_ha * 10_000) * 1.4
     dlat = lado_m / 111_000
     dlon = lado_m / (111_000 * math.cos(math.radians(lat)))
@@ -67,7 +81,7 @@ async def get_elevation_grid(lat: float, lon: float, area_ha: float) -> dict:
                     elevations.append(float(elev) if elev is not None else None)
 
         valid = [e for e in elevations if e is not None]
-        fill = float(np.mean(valid)) if valid else (400.0 + abs(lat) * 2)
+        fill = float(np.mean(valid)) if valid else (400.0 + abs(max(-90.0, min(90.0, lat))) * 5)
         elevations = [e if e is not None else fill for e in elevations]
         grid_z = np.array(elevations, dtype=float).reshape(n, n)
 
@@ -88,7 +102,8 @@ async def get_elevation_grid(lat: float, lon: float, area_ha: float) -> dict:
 
 
 def _synthetic_elevation(n: int, lat: float, lon: float, area_ha: float) -> np.ndarray:
-    base = 400.0 + abs(lat) * 2
+    lat_safe = max(-90.0, min(90.0, float(lat)))
+    base = 400.0 + abs(lat_safe) * 5
     x = np.linspace(0, 1, n)
     y = np.linspace(0, 1, n)
     X, Y = np.meshgrid(x, y)
@@ -175,20 +190,3 @@ def get_solar_info(lat: float, orientacao: str) -> dict:
     faces_sol = {
         "N":  "Recebe sol o dia todo (hemisferio sul)" if lat < 0 else "Pouca incidencia direta",
         "S":  "Pouca incidencia direta (hemisferio sul)" if lat < 0 else "Recebe sol o dia todo",
-        "L":  "Sol da manha - ideal para dormitorios",
-        "O":  "Sol da tarde - ideal para areas sociais",
-        "NE": "Sol manha/tarde - excelente para condominios",
-        "NO": "Sol tarde - bom para areas sociais",
-        "SE": "Sol manha - bom para dormitorios",
-        "SO": "Sol tarde - cuidado com superaquecimento",
-    }
-    return {
-        "hemisferio": hemisferio,
-        "orientacao": orientacao,
-        "descricao": faces_sol.get(orientacao, "Orientacao mista"),
-        "recomendacao_implantacao": (
-            "Posicionar frente dos lotes voltada para N ou NE"
-            if lat < 0 else
-            "Posicionar frente dos lotes voltada para S ou SE"
-        ),
-    }
