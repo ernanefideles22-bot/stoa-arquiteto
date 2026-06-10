@@ -49,8 +49,9 @@ header{background:var(--panel);border-bottom:1px solid var(--border);padding:0 2
 .content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 
 /* ── TABS ── */
-.tabs{background:var(--panel);border-bottom:1px solid var(--border);display:flex;padding:0 20px;flex-shrink:0;}
-.tab{padding:14px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:.2s;display:flex;align-items:center;gap:6px;}
+.tabs{background:var(--panel);border-bottom:1px solid var(--border);display:flex;padding:0 20px;flex-shrink:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{padding:14px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:.2s;display:flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap;}
 .tab:hover{color:var(--text);}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .tab-badge{background:var(--accent);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;}
@@ -141,6 +142,9 @@ textarea{resize:vertical;min-height:72px;}
 /* ── EMPTY STATE ── */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text2);text-align:center;gap:12px;}
 .empty-icon{font-size:48px;opacity:.4;}
+
+/* ── RELATÓRIO ── */
+#pdfFrame{width:100%;height:500px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;}
 </style>
 </head>
 <body>
@@ -180,7 +184,7 @@ textarea{resize:vertical;min-height:72px;}
       <div class="tab" data-tab="topography" onclick="showTab('topography')">⛰️ Topografia</div>
       <div class="tab" data-tab="implantation" onclick="showTab('implantation')">🗺️ Implantação</div>
       <div class="tab" data-tab="financial" onclick="showTab('financial')">💰 Viabilidade</div>
-      <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');load3DScene()">🎯 3D</div>
+      <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');init3D()">🎯 3D</div>
       <div class="tab" data-tab="relatorio" onclick="showTab('relatorio')">📄 Relatório</div>
     </nav>
 
@@ -403,9 +407,10 @@ textarea{resize:vertical;min-height:72px;}
             <button class="btn btn-outline" onclick="zoom3D(1.2)">🔍 Zoom +</button>
             <button class="btn btn-outline" onclick="zoom3D(0.8)">🔍 Zoom -</button>
             <button class="btn btn-outline" onclick="reset3D()">⟳ Reset</button>
+            <button class="btn btn-outline" onclick="reload3D()">🔄 Recarregar Terreno</button>
           </div>
           <p style="font-size:11px;color:var(--text2);margin-top:8px;">
-            Arraste para rotacionar • Scroll para zoom
+            Arraste para rotacionar • Scroll para zoom • Lotes posicionados sobre o relevo real
           </p>
         </div>
       </div>
@@ -414,10 +419,19 @@ textarea{resize:vertical;min-height:72px;}
       <div class="panel" id="panel-relatorio">
         <div class="card">
           <div class="card-title"><span>📄</span> Relatório de Viabilidade</div>
-          <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Gera relatório completo com resumo executivo IA e PDF para download.</p>
-          <button class="btn btn-primary" onclick="generateReport()" id="btnReport">📄 Gerar Relatório com IA</button>
+          <p style="color:var(--text2);font-size:13px;margin-bottom:16px">
+            Gera um PDF executivo com análise topográfica, implantação selecionada e viabilidade financeira.
+          </p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="generateReport()" id="btnReport">
+              📋 Gerar Relatório PDF
+            </button>
+            <a id="pdfDownload" style="display:none" class="btn btn-outline" download="relatorio.pdf">
+              ⬇ Baixar PDF
+            </a>
+          </div>
         </div>
-        <div id="reportResults"></div>
+        <div id="reportPreview"></div>
       </div>
 
     </div><!-- /panels -->
@@ -461,7 +475,7 @@ textarea{resize:vertical;min-height:72px;}
 </div>
 
 <script>
-const API = '';  // mesmo servidor
+const API = '';
 let currentProject = null;
 let map = null;
 let marker = null;
@@ -549,6 +563,7 @@ function renderOverview() {
         ${p.has_terrain && !p.has_topography ? `<button class="btn btn-primary" onclick="showTab('terrain')">+ Analisar Topografia</button>` : ''}
         ${p.has_topography && !p.has_implantation ? `<button class="btn btn-primary" onclick="showTab('implantation')">+ Gerar Implantação</button>` : ''}
         ${p.has_implantation && !p.has_financial ? `<button class="btn btn-primary" onclick="showTab('financial')">+ Analisar Viabilidade</button>` : ''}
+        ${p.has_financial ? `<button class="btn btn-outline" onclick="showTab('relatorio')">📄 Gerar Relatório</button>` : ''}
       </div>
     </div>
     <div style="color:var(--text2);font-size:12px;padding:4px 0">
@@ -593,7 +608,6 @@ function showTab(name) {
   document.querySelector(`[data-tab="${name}"]`).classList.add('active');
   document.getElementById(`panel-${name}`).classList.add('active');
   if (name === 'topography' && currentProject?.has_topography) loadTopography();
-  if (name === 'terrain') setTimeout(() => map && map.invalidateSize(), 150);
   if (name === 'terrain' && currentProject?.has_terrain) loadTerrainForm();
 }
 
@@ -742,7 +756,6 @@ async function loadTopography() {
     const res = await fetch(`${API}/api/terrain/${currentProject.id}`);
     const data = await res.json();
     if (data.topography) {
-      // Reconstituir resultado para renderizar
       renderTopographyResults({
         terrain: data.terrain,
         topography: {
@@ -794,13 +807,13 @@ function renderTopographyResults(data) {
     ${topo.img_topografia ? `
     <div class="card">
       <div class="card-title"><span>🗺️</span> Análise Topográfica</div>
-      <img class="img-result" src="${topo.img_topografia}" alt="Topografia">
+      <img class="img-result" src="data:image/png;base64,${topo.img_topografia}" alt="Topografia">
     </div>` : ''}
 
     ${topo.img_zonas ? `
     <div class="card">
       <div class="card-title"><span>📊</span> Distribuição de Declividade</div>
-      <img class="img-result" src="${topo.img_zonas}" alt="Declividade">
+      <img class="img-result" src="data:image/png;base64,${topo.img_zonas}" alt="Declividade">
     </div>` : ''}
 
     <div class="ia-card">
@@ -890,7 +903,7 @@ function renderImplantationResults(data) {
               ${(alt.vantagens||[]).map(v=>`<div style="font-size:11px;color:var(--success)">✓ ${v}</div>`).join('')}
               ${(alt.desvantagens||[]).map(v=>`<div style="font-size:11px;color:var(--warn)">⚠ ${v}</div>`).join('')}
             </div>
-            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="selectAlt(${alt.id})">
+            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="event.stopPropagation();selectAlt(${alt.id})">
               Selecionar esta opção
             </button>
           </div>
@@ -913,9 +926,15 @@ async function selectAlt(id) {
   const r = await fetch(`${API}/api/projects/${currentProject.id}`);
   currentProject = await r.json();
   renderOverview();
+  // Reset 3D so it reloads with new lote positions next time
+  if (renderer3D) {
+    renderer3D.dispose();
+    renderer3D = null;
+    scene3D = null;
+  }
 }
 
-// ── FINANCEIRO ───────────────────────────────────────────────────────────
+// ── FINANCEIRO ──────────────────────────────────────────────────────────
 
 async function analyzeFinancial() {
   if (!currentProject) { alert('Selecione um projeto'); return; }
@@ -975,7 +994,7 @@ function renderFinancialResults(data) {
     ${data.img_financeiro ? `
     <div class="card">
       <div class="card-title"><span>📈</span> Análise Financeira</div>
-      <img class="img-result" src="${data.img_financeiro}" alt="Financeiro">
+      <img class="img-result" src="data:image/png;base64,${data.img_financeiro}" alt="Financeiro">
     </div>` : ''}
 
     <div class="card">
@@ -1009,7 +1028,58 @@ function renderFinancialResults(data) {
   `;
 }
 
-// ── 3D ───────────────────────────────────────────────────────────────────
+// ── RELATÓRIO ──────────────────────────────────────────────────────────
+
+async function generateReport() {
+  if (!currentProject) { alert('Selecione um projeto'); return; }
+  const btn = document.getElementById('btnReport');
+  btn.textContent = '⏳ Gerando relatório...';
+  btn.disabled = true;
+  document.getElementById('reportPreview').innerHTML =
+    '<div class="loading"><div class="spinner"></div><span>Gerando PDF com IA (~30s)...</span></div>';
+
+  try {
+    const res = await fetch(`${API}/api/report/generate`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({project_id: currentProject.id})
+    });
+    const data = await res.json();
+
+    if (data.pdf_base64) {
+      const dlLink = document.getElementById('pdfDownload');
+      dlLink.href = 'data:application/pdf;base64,' + data.pdf_base64;
+      dlLink.download = (currentProject.name || 'relatorio').replace(/[^a-zA-Z0-9]\/g,'_') + '.pdf';
+      dlLink.style.display = 'inline-block';
+
+      document.getElementById('reportPreview').innerHTML = `
+        <div class="card">
+          <div class="card-title"><span>✅</span> Relatório Gerado</div>
+          <div class="ia-card" style="margin-bottom:16px">
+            <p style="font-size:13px;line-height:1.7">${data.resumo_executivo || 'Resumo não disponível'}</p>
+          </div>
+          <iframe src="data:application/pdf;base64,${data.pdf_base64}"
+            style="width:100%;height:520px;border:1px solid var(--border);border-radius:var(--radius)">
+          </iframe>
+        </div>
+      `;
+    } else {
+      document.getElementById('reportPreview').innerHTML = `
+        <div class="card" style="border-color:rgba(244,67,54,.3)">
+          <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Erro ao gerar PDF</div>
+          <pre style="font-size:10px;color:var(--text2);overflow:auto;max-height:200px">${data.debug_pdf_error || 'Desconhecido'}</pre>
+        </div>`;
+    }
+  } catch(e) {
+    document.getElementById('reportPreview').innerHTML =
+      `<div class="card"><p style="color:var(--danger)">Erro: ${e.message}</p></div>`;
+  }
+
+  btn.textContent = '📋 Gerar Relatório PDF';
+  btn.disabled = false;
+}
+
+// ── 3D ──────────────────────────────────────────────────────────────────
 
 function init3D() {
   const canvas = document.getElementById('canvas3d');
@@ -1037,7 +1107,11 @@ function init3D() {
   scene3D.add(new THREE.GridHelper(60, 30, 0x1e2340, 0x1e2340));
 
   // Load real terrain or fallback
-  _doLoad3D();
+  if (currentProject) {
+    _loadRealTerrain();
+  } else {
+    _add3DExample();
+  }
 
   // Mouse rotate
   let isDragging = false, prevX, prevY;
@@ -1059,88 +1133,147 @@ function init3D() {
   animate();
 }
 
-function load3DScene() {
-  if (!renderer3D) init3D();
-  else {
-    // Clear meshes
-    const rem = [];
-    scene3D.children.forEach(c => { if (c instanceof THREE.Mesh || c instanceof THREE.LineSegments) rem.push(c); });
-    rem.forEach(c => scene3D.remove(c));
-    _doLoad3D();
+function reload3D() {
+  if (!scene3D) return;
+  // Clear meshes, keep lights and grid
+  const toRemove = [];
+  scene3D.traverse(obj => {
+    if (obj.isMesh || (obj.isLineSegments && !(obj instanceof THREE.GridHelper))) {
+      toRemove.push(obj);
+    }
+  });
+  toRemove.forEach(o => { scene3D.remove(o); if (o.geometry) o.geometry.dispose(); });
+  if (currentProject) {
+    _loadRealTerrain();
+  } else {
+    _add3DExample();
   }
 }
 
-function _doLoad3D() {
+async function _loadRealTerrain() {
   if (!currentProject) { _add3DExample(); return; }
-  fetch(API + '/api/terrain/' + currentProject.id + '/elevation')
-    .then(r => r.ok ? r.json() : null)
-    .then(data => {
-      if (data && data.elevation_grid && data.elevation_grid.elevations) {
-        _buildRealTerrain(data);
-      } else { _add3DExample(); }
-    })
-    .catch(() => _add3DExample());
+  try {
+    const res = await fetch(`${API}/api/terrain/${currentProject.id}/elevation`);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    if (data.elevation_grid && data.elevation_grid.elevations) {
+      _buildRealTerrain(data);
+    } else {
+      _add3DExample();
+    }
+  } catch(e) {
+    console.warn('3D terrain load failed, using example:', e);
+    _add3DExample();
+  }
 }
 
 function _buildRealTerrain(data) {
-  const grid = data.elevation_grid;
-  const elevations = grid.elevations;
-  const n = grid.n || elevations.length;
-  const SIZE = 50;
-  const flat = [].concat(...elevations);
-  const minE = Math.min.apply(null, flat);
-  const maxE = Math.max.apply(null, flat);
-  const range = maxE - minE || 1;
-  const scale = 8;
+  const SIZE  = 40;
+  const SCALE = 8;
+  const grid  = data.elevation_grid;
+  const n     = grid.n || 10;
 
+  // Flatten elevations
+  const flat = Array.isArray(grid.elevations[0])
+    ? grid.elevations.flat()
+    : grid.elevations;
+  const minE  = Math.min(...flat);
+  const maxE  = Math.max(...flat);
+  const range = (maxE - minE) || 1;
+
+  // Helper: sample terrain height at normalized position (nx, nz) in [0,1]
+  function sampleH(nx, nz) {
+    const ri = Math.min(Math.floor(nz * (n - 1)), n - 1);
+    const ci = Math.min(Math.floor(nx * (n - 1)), n - 1);
+    const row = Array.isArray(grid.elevations[ri]) ? grid.elevations[ri][ci] : flat[ri * n + ci];
+    return ((row - minE) / range) * SCALE;
+  }
+
+  // Build terrain mesh with PlaneGeometry
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, n - 1, n - 1);
   geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  for (let row = 0; row < n; row++) {
-    for (let col = 0; col < n; col++) {
-      const idx = row * n + col;
-      const elev = Array.isArray(elevations[row]) ? elevations[row][col] : flat[idx];
-      pos.setY(idx, ((elev - minE) / range) * scale);
+  const pos = geo.attributes.position.array;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const idx = (i * n + j) * 3;
+      const row = Array.isArray(grid.elevations[i]) ? grid.elevations[i][j] : flat[i * n + j];
+      pos[idx + 1] = ((row - minE) / range) * SCALE;
     }
   }
   geo.computeVertexNormals();
-  scene3D.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color: 0x4a7c4e})));
-  scene3D.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color: 0x2d4a2d, wireframe:true, opacity:0.15, transparent:true})));
 
-  const numLotes = Math.min(data.num_lotes || 0, 40);
-  if (numLotes > 0) {
-    const avgH = scale * 0.5;
-    const colors = [0x4fc3f7, 0x81d4fa, 0x7c4dff, 0x29b6f6];
-    const cols = Math.ceil(Math.sqrt(numLotes));
-    const sp = SIZE / (cols + 1);
-    for (let i = 0; i < numLotes; i++) {
-      const r2 = Math.floor(i / cols), c2 = i % cols;
-      const lh = 1.5 + Math.random() * 1.5;
-      const g = new THREE.BoxGeometry(sp * 0.65, lh, sp * 0.65);
-      const m = new THREE.MeshLambertMaterial({color: colors[i % colors.length], transparent:true, opacity:0.85});
-      const box = new THREE.Mesh(g, m);
-      box.position.set(-SIZE/2 + sp * (c2+1), avgH + lh/2, -SIZE/2 + sp * (r2+1));
-      scene3D.add(box);
-      const el = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({color:0x000000, opacity:0.3, transparent:true}));
-      el.position.copy(box.position);
-      scene3D.add(el);
+  const mat = new THREE.MeshLambertMaterial({color: 0x4a5c3a});
+  scene3D.add(new THREE.Mesh(geo, mat));
+
+  // Wireframe overlay
+  const wgeo = geo.clone();
+  const wmat = new THREE.MeshBasicMaterial({color: 0x2d3a1e, wireframe: true, opacity: 0.25, transparent: true});
+  scene3D.add(new THREE.Mesh(wgeo, wmat));
+
+  // Place lotes
+  const lotes  = data.lotes || [];
+  const numL   = data.num_lotes || lotes.length || 0;
+  const colors = [0x4fc3f7, 0x81d4fa, 0x29b6f6, 0x039be5, 0x7c4dff, 0x9c6dff];
+  const LH     = 3; // lote box height
+
+  function placeBox(nx, nz, colorIdx) {
+    const terrH = sampleH(nx, nz);
+    const bx    = new THREE.BoxGeometry(3.5, LH, 3.5);
+    const bm    = new THREE.MeshLambertMaterial({
+      color: colors[colorIdx % colors.length], transparent: true, opacity: 0.85
+    });
+    const box = new THREE.Mesh(bx, bm);
+    box.position.set(
+      -SIZE / 2 + nx * SIZE,
+      terrH + LH / 2,
+      -SIZE / 2 + nz * SIZE
+    );
+    scene3D.add(box);
+    const edges = new THREE.EdgesGeometry(bx);
+    const line  = new THREE.LineSegments(
+      edges,
+      new THREE.LineBasicMaterial({color: 0x000000, opacity: 0.3, transparent: true})
+    );
+    line.position.copy(box.position);
+    scene3D.add(line);
+  }
+
+  if (lotes.length > 0) {
+    // Use real positions from API
+    lotes.forEach((l, i) => placeBox(l.x, l.z, i));
+  } else if (numL > 0) {
+    // Distribute evenly in a grid
+    const cols = Math.ceil(Math.sqrt(Math.min(numL, 30)));
+    const rows = Math.ceil(Math.min(numL, 30) / cols);
+    for (let i = 0; i < Math.min(numL, 30); i++) {
+      const c  = i % cols, r = Math.floor(i / cols);
+      const nx = (c + 1) / (cols + 1);
+      const nz = (r + 1) / (rows + 1);
+      placeBox(nx, nz, i);
     }
   }
 }
 
 function _add3DExample() {
+  // Placeholder flat terrain + example volumes
   const geo = new THREE.BoxGeometry(40, 1, 30);
-  scene3D.add(Object.assign(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color: 0x4a5c3a})), {position: new THREE.Vector3(0,-0.5,0)}));
+  const mat = new THREE.MeshLambertMaterial({color: 0x4a5c3a});
+  const terrain = new THREE.Mesh(geo, mat);
+  terrain.position.y = -0.5;
+  scene3D.add(terrain);
+
   const colors = [0x4fc3f7, 0x81d4fa, 0x29b6f6, 0x039be5];
   for (let i = 0; i < 8; i++) {
     const h = 2 + Math.random() * 4;
     const g = new THREE.BoxGeometry(3, h, 4);
-    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({color: colors[i%colors.length], transparent:true, opacity:.85}));
-    mesh.position.set(-14 + (i%4)*8, h/2, -6 + Math.floor(i/4)*10);
+    const m = new THREE.MeshLambertMaterial({color: colors[i % colors.length], transparent:true, opacity:.85});
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.set(-14 + (i % 4) * 8, h/2, -6 + Math.floor(i/4) * 10);
     scene3D.add(mesh);
-    const el = new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({color:0x000000, opacity:.3, transparent:true}));
-    el.position.copy(mesh.position);
-    scene3D.add(el);
+    const edges = new THREE.EdgesGeometry(g);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x000000, opacity:.3, transparent:true}));
+    line.position.copy(mesh.position);
+    scene3D.add(line);
   }
 }
 
@@ -1155,42 +1288,7 @@ function reset3D() {
   camera3D.lookAt(0, 0, 0);
 }
 
-// ── RELATÓRIO ───────────────────────────────────────────────────────────
-
-async function generateReport() {
-  if (!currentProject) { alert('Selecione um projeto'); return; }
-  const btn = document.getElementById('btnReport');
-  btn.textContent = '⏳ Gerando com IA...';
-  btn.disabled = true;
-  try {
-    const res = await fetch(API + '/api/report/generate', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({project_id: currentProject.id})
-    });
-    const data = await res.json();
-    if (res.ok) { renderReportResults(data); }
-    else { alert('Erro: ' + (data.detail || JSON.stringify(data))); }
-  } catch(e) { alert('Erro: ' + e.message); }
-  btn.textContent = '📄 Gerar Relatório com IA';
-  btn.disabled = false;
-}
-
-function renderReportResults(data) {
-  const pdfUrl = data.pdf_base64 ? 'data:application/pdf;base64,' + data.pdf_base64 : null;
-  const labels = ['Terreno','Topografia','Implantação','Financeiro'];
-  const keys = ['has_terrain','has_topo','has_implantacao','has_financeiro'];
-  const tags = labels.map((l,i) => '<span class="tag ' + (data[keys[i]] ? 'tag-good' : 'tag-warn') + '">' + (data[keys[i]] ? '✓' : '—') + ' ' + l + '</span>').join('');
-  document.getElementById('reportResults').innerHTML =
-    '<div class="card"><div class="card-title"><span>📋</span> Resumo Executivo</div>' +
-    '<div style="background:#0d0f1a;border-radius:8px;padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap">' + (data.resumo_executivo || '—') + '</div></div>' +
-    '<div class="card"><div class="card-title"><span>📦</span> Módulos incluídos</div><div class="tag-list">' + tags + '</div></div>' +
-    (pdfUrl ? '<div class="card"><div class="card-title"><span>📥</span> Download PDF</div>' +
-    '<a href="' + pdfUrl + '" download="relatorio-' + (currentProject ? currentProject.name.replace(/[^a-z0-9]/gi,'-') : 'projeto') + '.pdf"' +
-    ' style="display:inline-block;padding:10px 24px;background:var(--accent);color:#000;border-radius:6px;font-weight:700;text-decoration:none;font-size:13px">⬇ Baixar PDF</a>' +
-    '<p style="font-size:11px;color:var(--text2);margin-top:8px">Gerado em ' + new Date().toLocaleDateString('pt-BR') + '</p></div>' : '');
-}
-
-// ── MODAL new project ─────────────────────────────────────────────────────
+// ── MODAL new project ──────────────────────────────────────────────────
 
 document.getElementById('newProjectModal').addEventListener('click', function(e) {
   if (e.target === this) closeNewProjectModal();
