@@ -609,6 +609,7 @@ function showTab(name) {
   document.getElementById(`panel-${name}`).classList.add('active');
   if (name === 'topography' && currentProject?.has_topography) loadTopography();
   if (name === 'terrain' && currentProject?.has_terrain) loadTerrainForm();
+  if (name === 'financial' && currentProject?.has_financial) loadFinancial();
 }
 
 async function loadTerrainForm() {
@@ -748,6 +749,23 @@ async function analyzeTerrain() {
 
   btn.textContent = '🤖 Analisar com IA';
   btn.disabled = false;
+}
+
+async function loadFinancial() {
+  if (!currentProject) return;
+  try {
+    const res = await fetch(API + '/api/financial/' + currentProject.id);
+    if (!res.ok) return;
+    const d = await res.json();
+    renderFinancialResults({
+      resultado: {lucro_bruto: d.lucro_bruto, margem_bruta_percent: d.margem_bruta, payback_meses: d.payback_meses},
+      receitas: {vgv_total: d.vgv},
+      custos: {},
+      cenarios: d.cenarios || {},
+      recomendacoes_financeiras: [],
+      alertas: [],
+    });
+  } catch(e) {}
 }
 
 async function loadTopography() {
