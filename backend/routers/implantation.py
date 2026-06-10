@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
+import math
 
 from ..models.database import get_db, Project, Terrain, Topography, Implantation
 from ..services import ai_engine
@@ -11,8 +12,8 @@ router = APIRouter(prefix="/api/implantation", tags=["implantation"])
 
 class ImplantationRequest(BaseModel):
     project_id: int
-    typology: str                      # condominio, loteamento, residencial, pousada...
-    programa: dict                     # num_lotes desejado, área mínima lote, etc.
+    typology: str
+    programa: dict
 
 
 class SelectImplantation(BaseModel):
@@ -22,15 +23,15 @@ class SelectImplantation(BaseModel):
 
 @router.post("/generate")
 async def generate_implantations(data: ImplantationRequest, db: Session = Depends(get_db)):
-    """Gera 3 alternativas de implantação via IA."""
+    """Gera 3 alternativas de implantacao via IA."""
     project = db.query(Project).filter(Project.id == data.project_id).first()
     if not project:
-        raise HTTPException(404, "Projeto não encontrado")
+        raise HTTPException(404, "Projeto nao encontrado")
 
     terrain = db.query(Terrain).filter(Terrain.project_id == data.project_id).first()
     topo    = db.query(Topography).filter(Topography.project_id == data.project_id).first()
     if not terrain or not topo:
-        raise HTTPException(400, "Análise de terreno necessária antes da implantação")
+        raise HTTPException(400, "Analise de terreno necessaria antes da implantacao")
 
     terrain_ctx = {
         "address": terrain.address,
@@ -52,13 +53,11 @@ async def generate_implantations(data: ImplantationRequest, db: Session = Depend
         terrain_ctx, topo_ctx, data.typology, data.programa
     )
 
-    # Salvar alternativas
-    # Remover alternativas antigas
     db.query(Implantation).filter(Implantation.project_id == data.project_id).delete()
 
     saved = []
     for alt in result.get("alternativas", []):
-        prog = alt.get("programa", {})
+        prog   = alt.get("programa", {})
         scores = alt.get("scores", {})
         imp = Implantation(
             project_id=data.project_id,
@@ -95,17 +94,12 @@ async def generate_implantations(data: ImplantationRequest, db: Session = Depend
         })
 
     db.commit()
-
-    return {
-        "alternativas": saved,
-        "recomendacao": result.get("recomendacao"),
-    }
+    return {"alternativas": saved, "recomendacao": result.get("recomendacao")}
 
 
 @router.post("/select")
 def select_implantation(data: SelectImplantation, db: Session = Depends(get_db)):
-    """Marca uma alternativa como selecionada."""
-    # Desmarcar todas
+    """Marca uma alternativa como selecionada e gera posicoes dos lotes."""
     db.query(Implantation).filter(
         Implantation.project_id == data.project_id
     ).update({"is_selected": False})
@@ -115,11 +109,27 @@ def select_implantation(data: SelectImplantation, db: Session = Depends(get_db))
         Implantation.project_id == data.project_id,
     ).first()
     if not imp:
-        raise HTTPException(404, "Implantação não encontrada")
+        raise HTTPException(404, "Implantacao nao encontrada")
 
     imp.is_selected = True
+
+    # Generate normalized (x, z) grid positions for each lote [0..1]
+    n = imp.num_lotes or 0
+    if n > 0:
+        cols = math.ceil(math.sqrt(n))
+        rows = math.ceil(n / cols)
+        lotes_data = [
+            {
+                "x": round((i % cols + 1) / (cols + 1), 4),
+                "z": round((i // cols + 1) / (rows + 1), 4),
+                "area": float(imp.area_media_lote or 300),
+            }
+            for i in range(min(n, 40))
+        ]
+        imp.lotes = lotes_data
+
     db.commit()
-    return {"ok": True, "selected": imp.nome}
+    return {"ok": True, "selected": imp.nome, "lotes_count": len(imp.lotes) if imp.lotes else 0}
 
 
 @router.get("/{project_id}")
