@@ -807,13 +807,13 @@ function renderTopographyResults(data) {
     ${topo.img_topografia ? `
     <div class="card">
       <div class="card-title"><span>🗺️</span> Análise Topográfica</div>
-      <img class="img-result" src="data:image/png;base64,${topo.img_topografia}" alt="Topografia">
+      <img class="img-result" src="${topo.img_topografia}" alt="Topografia">
     </div>` : ''}
 
     ${topo.img_zonas ? `
     <div class="card">
       <div class="card-title"><span>📊</span> Distribuição de Declividade</div>
-      <img class="img-result" src="data:image/png;base64,${topo.img_zonas}" alt="Declividade">
+      <img class="img-result" src="${topo.img_zonas}" alt="Declividade">
     </div>` : ''}
 
     <div class="ia-card">
@@ -994,7 +994,7 @@ function renderFinancialResults(data) {
     ${data.img_financeiro ? `
     <div class="card">
       <div class="card-title"><span>📈</span> Análise Financeira</div>
-      <img class="img-result" src="data:image/png;base64,${data.img_financeiro}" alt="Financeiro">
+      <img class="img-result" src="${data.img_financeiro}" alt="Financeiro">
     </div>` : ''}
 
     <div class="card">
