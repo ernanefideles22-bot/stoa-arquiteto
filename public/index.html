@@ -552,7 +552,7 @@ function renderOverview() {
   ];
   document.getElementById('overviewContent').innerHTML = `
     <div class="card">
-      <div class="card-title"><span>ð</span> ${p.name}</div>
+      <div class="card-title"><span>ð</span> ${p.name}</div>
       <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
         <div><label style="color:var(--text2);font-size:11px">CLIENTE</label><div>${p.client || 'â'}</div></div>
         <div><label style="color:var(--text2);font-size:11px">TIPOLOGIA</label><div>${p.typology || 'â'}</div></div>
@@ -1087,4 +1087,139 @@ function init3D() {
   camera3D.lookAt(0, 0, 0);
 
   renderer3D = new THREE.WebGLRenderer({canvas, antialias: true});
-  re
+nderer3D.setSize(canvas.clientWidth, canvas.clientHeight);
+  renderer3D.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // IluminaÃ§Ã£o
+  scene3D.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+  sun.position.set(50, 80, 50);
+  scene3D.add(sun);
+
+  // Controles manuais de Ã³rbita
+  let _drag = false, _px = 0, _py = 0;
+  canvas.addEventListener('mousedown', e => { _drag = true; _px = e.clientX; _py = e.clientY; });
+  window.addEventListener('mouseup', () => _drag = false);
+  canvas.addEventListener('mousemove', e => {
+    if (!_drag) return;
+    scene3D.rotation.y += (e.clientX - _px) * 0.01;
+    scene3D.rotation.x += (e.clientY - _py) * 0.005;
+    _px = e.clientX; _py = e.clientY;
+  });
+  canvas.addEventListener('wheel', e => {
+    camera3D.position.multiplyScalar(1 + e.deltaY * 0.001);
+    e.preventDefault();
+  }, {passive: false});
+
+  // Carregar terreno se projeto tiver dados
+  if (currentProject && currentProject.has_topography) {
+    load3DTerrain();
+  } else {
+    buildPlaceholder3D();
+  }
+
+  animate3D();
+}
+
+async function load3DTerrain() {
+  if (!currentProject) return;
+  try {
+    const res = await fetch(`${API}/api/terrain/${currentProject.id}`);
+    if (!res.ok) { buildPlaceholder3D(); return; }
+    const data = await res.json();
+    const topo = data.topography;
+
+    // Remover mesh anterior
+    const old = scene3D.getObjectByName('terrain_mesh');
+    if (old) { scene3D.remove(old); old.geometry.dispose(); old.material.dispose(); }
+    scene3D.children.filter(o => o.name === 'lot').forEach(o => { scene3D.remove(o); o.geometry.dispose(); o.material.dispose(); });
+
+    if (topo && topo.elevation_grid) {
+      const grid = topo.elevation_grid;
+      const n = grid.n || 10;
+      const elevs = grid.elevations;
+      const flat = Array.isArray(elevs[0]) ? elevs.flat() : elevs;
+      const minE = Math.min(...flat), maxE = Math.max(...flat);
+      const range = maxE - minE || 1;
+
+      const geo = new THREE.PlaneGeometry(40, 40, n - 1, n - 1);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        pos.setZ(i, ((flat[Math.min(i, flat.length - 1)] - minE) / range) * 10);
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshLambertMaterial({ color: 0x2a5c27 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'terrain_mesh';
+      mesh.rotation.x = -Math.PI / 2;
+      scene3D.add(mesh);
+
+      // Lotes da implantaÃ§Ã£o selecionada
+      try {
+        const ir = await fetch(`${API}/api/implantation/${currentProject.id}`);
+        if (ir.ok) {
+          const alts = await ir.json();
+          const sel = alts.find(a => a.selected) || alts[0];
+          if (sel && sel.num_lotes) {
+            const cols = Math.ceil(Math.sqrt(sel.num_lotes));
+            const count = Math.min(sel.num_lotes, 60);
+            for (let i = 0; i < count; i++) {
+              const col = i % cols, row = Math.floor(i / cols);
+              const fx = col / cols, fz = row / cols;
+              const xi = Math.round(fx* (n - 1));
+              const zi = Math.round(fz * (n - 1));
+              const elev = ((flat[Math.min(xi + zi * n, flat.length - 1)] - minE) / range) * 10;
+              const lg = new THREE.BoxGeometry(3.2, 0.4, 3.2);
+              const lm = new THREE.MeshLambertMaterial({ color: 0x4fc3f7, transparent: true, opacity: 0.85 });
+              const lot = new THREE.Mesh(lg, lm);
+              lot.name = 'lot';
+              lot.position.set(fx * 38 - 19, elev + 0.2, fz * 38 - 19);
+              scene3D.add(lot);
+            }
+          }
+        }
+      } catch(e) {}
+
+    } else {
+      buildPlaceholder3D();
+    }
+  } catch(e) {
+    buildPlaceholder3D();
+  }
+}
+
+function buildPlaceholder3D() {
+  const old = scene3D.getObjectByName('terrain_mesh');
+  if (old) { scene3D.remove(old); old.geometry.dispose(); old.material.dispose(); }
+  const geo = new THREE.PlaneGeometry(40, 40, 12, 12);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x1a3020 });
+  const mesh = new THREE.Mesh(seo, mat);
+  mesh.name = 'terrain_mesh';
+  mesh.rotation.x = -Math.PI / 2;
+  scene3D.add(mesh);
+  // Grade
+  const grid = new THREE.GridHelper(40, 12, 0x2a4a2a, 0x2a4a2a);
+  grid.name = 'terrain_mesh';
+  scene3D.add(grid);
+}
+
+function zoom3D(factor) {
+  if (camera3D) camera3D.position.multiplyScalar(factor);
+}
+
+function reset3D() {
+  if (!camera3D) return;
+  camera3D.position.set(30, 25, 30);
+  camera3D.lookAt(0, 0, 0);
+  if (scene3D) scene3D.rotation.set(0, 0, 0);
+}
+
+function animate3D() {
+  animId = requestAnimationFrame(animate3D);
+  if (renderer3D && scene3D && camera3D) renderer3D.render(scene3D, camera3D);
+}
+</script>
+</body>
+</html>
