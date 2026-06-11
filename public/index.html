@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>STOA Civil — Desenvolvimento Imobiliário com IA</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<title>STOA Civil â Desenvolvimento ImobiliÃ¡rio com IA</title>
+<link rel="stylesheet" href="https://unpkg.com/cesium@1.118.0/Build/Cesium/Widgets/widgets.css"/>
+<script>window.CESIUM_BASE_URL='https://unpkg.com/cesium@1.118.0/Build/Cesium/';</script>
+<script src="https://unpkg.com/cesium@1.118.0/Build/Cesium/Cesium.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 :root{
@@ -16,7 +17,7 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 
-/* ── HEADER ── */
+/* ââ HEADER ââ */
 header{background:var(--panel);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100;}
 .logo{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;letter-spacing:.5px;}
 .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
@@ -28,10 +29,10 @@ header{background:var(--panel);border-bottom:1px solid var(--border);padding:0 2
 .btn-outline:hover{border-color:var(--accent);color:var(--accent);}
 .btn-danger{background:var(--danger);color:#fff;}
 
-/* ── LAYOUT ── */
+/* ââ LAYOUT ââ */
 .main{display:flex;flex:1;overflow:hidden;}
 
-/* ── SIDEBAR ── */
+/* ââ SIDEBAR ââ */
 .sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
 .sidebar-section{padding:16px;}
 .sidebar-section h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:10px;}
@@ -45,28 +46,27 @@ header{background:var(--panel);border-bottom:1px solid var(--border);padding:0 2
 .status-em_estudo{background:rgba(79,195,247,.2);color:var(--accent);}
 .status-execucao{background:rgba(76,175,80,.2);color:var(--success);}
 
-/* ── CONTENT ── */
+/* ââ CONTENT ââ */
 .content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 
-/* ── TABS ── */
-.tabs{background:var(--panel);border-bottom:1px solid var(--border);display:flex;padding:0 20px;flex-shrink:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;}
-.tabs::-webkit-scrollbar{display:none;}
-.tab{padding:14px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:.2s;display:flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap;}
+/* ââ TABS ââ */
+.tabs{background:var(--panel);border-bottom:1px solid var(--border);display:flex;padding:0 20px;flex-shrink:0;}
+.tab{padding:14px 18px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:.2s;display:flex;align-items:center;gap:6px;}
 .tab:hover{color:var(--text);}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .tab-badge{background:var(--accent);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;}
 
-/* ── PANELS ── */
+/* ââ PANELS ââ */
 .panels{flex:1;overflow:hidden;position:relative;}
 .panel{position:absolute;inset:0;overflow-y:auto;padding:24px;display:none;}
 .panel.active{display:block;}
 
-/* ── CARDS ── */
+/* ââ CARDS ââ */
 .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
 .card-title{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:var(--text);}
 .card-title span{font-size:16px;}
 
-/* ── FORM ── */
+/* ââ FORM ââ */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .form-grid.cols3{grid-template-columns:1fr 1fr 1fr;}
 .form-group{display:flex;flex-direction:column;gap:5px;}
@@ -79,17 +79,19 @@ textarea{resize:vertical;min-height:72px;}
 .checkbox-item{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;}
 .checkbox-item input{width:auto;}
 
-/* ── MAP ── */
-#map{height:380px;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;}
+/* ââ MAP ââ */
+#map{height:380px;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;position:relative;}
+#map .cesium-widget canvas{border-radius:var(--radius);}
+.cesium-widget-credits{display:none!important;}
 
-/* ── TOPOGRAFIA ── */
+/* ââ TOPOGRAFIA ââ */
 .topo-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .metric-card{background:#0d0f1a;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;}
 .metric-value{font-size:22px;font-weight:700;color:var(--accent);}
 .metric-label{font-size:11px;color:var(--text2);margin-top:4px;}
 .img-result{width:100%;border-radius:8px;border:1px solid var(--border);}
 
-/* ── IA ANALYSIS ── */
+/* ââ IA ANALYSIS ââ */
 .ia-card{background:linear-gradient(135deg,rgba(79,195,247,.08),rgba(124,77,255,.08));border:1px solid rgba(79,195,247,.2);border-radius:var(--radius);padding:20px;}
 .ia-score{font-size:40px;font-weight:800;color:var(--accent);}
 .ia-label{font-size:12px;color:var(--text2);}
@@ -99,7 +101,7 @@ textarea{resize:vertical;min-height:72px;}
 .tag-warn{background:rgba(255,152,0,.2);color:var(--warn);}
 .tag-bad{background:rgba(244,67,54,.2);color:var(--danger);}
 
-/* ── ALTERNATIVAS ── */
+/* ââ ALTERNATIVAS ââ */
 .alternatives-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
 .alt-card{background:var(--panel);border:2px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:.3s;}
 .alt-card:hover{border-color:var(--accent);}
@@ -110,7 +112,7 @@ textarea{resize:vertical;min-height:72px;}
 .alt-stat{font-size:11px;color:var(--text2);}
 .alt-stat strong{color:var(--text);display:block;font-size:13px;}
 
-/* ── FINANCEIRO ── */
+/* ââ FINANCEIRO ââ */
 .fin-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
 .kpi{background:#0d0f1a;border:1px solid var(--border);border-radius:8px;padding:16px;}
 .kpi-value{font-size:20px;font-weight:700;}
@@ -119,32 +121,29 @@ textarea{resize:vertical;min-height:72px;}
 .kpi-neutral{color:var(--accent);}
 .kpi-warn{color:var(--warn);}
 
-/* ── CANVAS 3D ── */
+/* ââ CANVAS 3D ââ */
 #canvas3d{width:100%;height:380px;border-radius:var(--radius);border:1px solid var(--border);display:block;}
 
-/* ── PROGRESS ── */
+/* ââ PROGRESS ââ */
 .progress-steps{display:flex;gap:0;margin-bottom:20px;}
 .step{flex:1;padding:10px 8px;text-align:center;font-size:11px;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border);position:relative;}
 .step.done{color:var(--success);border-bottom-color:var(--success);}
 .step.active{color:var(--accent);border-bottom-color:var(--accent);}
 
-/* ── LOADING ── */
+/* ââ LOADING ââ */
 .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px;color:var(--text2);}
 .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ── MODAL ── */
+/* ââ MODAL ââ */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;display:none;}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:480px;max-width:95vw;}
 .modal h2{margin-bottom:20px;font-size:16px;}
 
-/* ── EMPTY STATE ── */
+/* ââ EMPTY STATE ââ */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text2);text-align:center;gap:12px;}
 .empty-icon{font-size:48px;opacity:.4;}
-
-/* ── RELATÓRIO ── */
-#pdfFrame{width:100%;height:500px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;}
 </style>
 </head>
 <body>
@@ -152,7 +151,7 @@ textarea{resize:vertical;min-height:72px;}
 <!-- HEADER -->
 <header>
   <div class="logo">
-    <div class="logo-icon">🏗️</div>
+    <div class="logo-icon">ðï¸</div>
     STOA Civil
   </div>
   <div class="header-actions">
@@ -168,7 +167,7 @@ textarea{resize:vertical;min-height:72px;}
       <h3>Projetos</h3>
       <div class="project-list" id="projectList">
         <div class="empty-state" style="padding:20px">
-          <div class="empty-icon">📁</div>
+          <div class="empty-icon">ð</div>
           <small>Nenhum projeto ainda</small>
         </div>
       </div>
@@ -179,13 +178,12 @@ textarea{resize:vertical;min-height:72px;}
   <div class="content">
     <!-- TABS -->
     <nav class="tabs">
-      <div class="tab active" data-tab="overview" onclick="showTab('overview')">📊 Visão Geral</div>
-      <div class="tab" data-tab="terrain" onclick="showTab('terrain')">🌍 Terreno</div>
-      <div class="tab" data-tab="topography" onclick="showTab('topography')">⛰️ Topografia</div>
-      <div class="tab" data-tab="implantation" onclick="showTab('implantation')">🗺️ Implantação</div>
-      <div class="tab" data-tab="financial" onclick="showTab('financial')">💰 Viabilidade</div>
-      <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');init3D()">🎯 3D</div>
-      <div class="tab" data-tab="relatorio" onclick="showTab('relatorio')">📄 Relatório</div>
+      <div class="tab active" data-tab="overview" onclick="showTab('overview')">ð VisÃ£o Geral</div>
+      <div class="tab" data-tab="terrain" onclick="showTab('terrain')">ð Terreno</div>
+      <div class="tab" data-tab="topography" onclick="showTab('topography')">â°ï¸ Topografia</div>
+      <div class="tab" data-tab="implantation" onclick="showTab('implantation')">ðºï¸ ImplantaÃ§Ã£o</div>
+      <div class="tab" data-tab="financial" onclick="showTab('financial')">ð° Viabilidade</div>
+      <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');init3D()">ð¯ 3D</div>
     </nav>
 
     <!-- PANELS -->
@@ -195,9 +193,9 @@ textarea{resize:vertical;min-height:72px;}
       <div class="panel active" id="panel-overview">
         <div id="overviewContent">
           <div class="empty-state">
-            <div class="empty-icon">🏗️</div>
+            <div class="empty-icon">ðï¸</div>
             <h3>STOA Civil</h3>
-            <p>Selecione um projeto ou crie um novo para começar.</p>
+            <p>Selecione um projeto ou crie um novo para comeÃ§ar.</p>
             <button class="btn btn-primary" onclick="openNewProjectModal()">Criar primeiro projeto</button>
           </div>
         </div>
@@ -206,10 +204,10 @@ textarea{resize:vertical;min-height:72px;}
       <!-- TERRENO -->
       <div class="panel" id="panel-terrain">
         <div class="card">
-          <div class="card-title"><span>🌍</span> Cadastro do Terreno</div>
+          <div class="card-title"><span>ð</span> Cadastro do Terreno</div>
           <div class="form-grid">
             <div class="form-group full">
-              <label>Endereço / Localização</label>
+              <label>EndereÃ§o / LocalizaÃ§Ã£o</label>
               <input id="terrainAddress" placeholder="Ex: Estrada Municipal km 12, Resende, RJ" />
             </div>
             <div class="form-group">
@@ -229,13 +227,13 @@ textarea{resize:vertical;min-height:72px;}
               <input id="terrainLon" type="number" step="0.000001" placeholder="-44.4506" />
             </div>
             <div class="form-group">
-              <label>Área (hectares)</label>
+              <label>Ãrea (hectares)</label>
               <input id="terrainArea" type="number" step="0.1" placeholder="100" />
             </div>
             <div class="form-group">
               <label>Tipologia pretendida</label>
               <select id="terrainTypology">
-                <option value="condominio_loteamento">Condomínio / Loteamento</option>
+                <option value="condominio_loteamento">CondomÃ­nio / Loteamento</option>
                 <option value="residencial_unifamiliar">Residencial Unifamiliar</option>
                 <option value="pousada_hotel">Pousada / Hotel</option>
                 <option value="comercial">Comercial</option>
@@ -253,12 +251,12 @@ textarea{resize:vertical;min-height:72px;}
               </select>
             </div>
             <div class="form-group">
-              <label>Vegetação</label>
+              <label>VegetaÃ§Ã£o</label>
               <select id="terrainVeg">
                 <option value="nenhuma">Nenhuma</option>
                 <option value="rasteira" selected>Rasteira</option>
                 <option value="arbustiva">Arbustiva</option>
-                <option value="arborea">Arbórea</option>
+                <option value="arborea">ArbÃ³rea</option>
                 <option value="mata">Mata nativa</option>
               </select>
             </div>
@@ -271,36 +269,36 @@ textarea{resize:vertical;min-height:72px;}
               </select>
             </div>
             <div class="form-group full">
-              <label>Infraestrutura disponível</label>
+              <label>Infraestrutura disponÃ­vel</label>
               <div class="checkbox-group">
-                <label class="checkbox-item"><input type="checkbox" value="agua" class="infra-cb"> Água</label>
+                <label class="checkbox-item"><input type="checkbox" value="agua" class="infra-cb"> Ãgua</label>
                 <label class="checkbox-item"><input type="checkbox" value="esgoto" class="infra-cb"> Esgoto</label>
                 <label class="checkbox-item"><input type="checkbox" value="energia" class="infra-cb"> Energia</label>
-                <label class="checkbox-item"><input type="checkbox" value="pavimentacao" class="infra-cb"> Pavimentação</label>
+                <label class="checkbox-item"><input type="checkbox" value="pavimentacao" class="infra-cb"> PavimentaÃ§Ã£o</label>
                 <label class="checkbox-item"><input type="checkbox" value="telefone" class="infra-cb"> Telefone/Internet</label>
               </div>
             </div>
             <div class="form-group full">
-              <label>Zoneamento / Observações</label>
-              <textarea id="terrainNotes" placeholder="Zoneamento municipal, restrições conhecidas, observações..."></textarea>
+              <label>Zoneamento / ObservaÃ§Ãµes</label>
+              <textarea id="terrainNotes" placeholder="Zoneamento municipal, restriÃ§Ãµes conhecidas, observaÃ§Ãµes..."></textarea>
             </div>
           </div>
           <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-outline" onclick="saveTerrain()" id="btnSaveTerrain">
-              💾 Salvar e Localizar
+              ð¾ Salvar e Localizar
             </button>
             <button class="btn btn-primary" onclick="analyzeTerrain()" id="btnAnalyzeTerrain">
-              🤖 Analisar com IA
+              ð¤ Analisar com IA
             </button>
           </div>
         </div>
 
         <!-- Mapa -->
         <div class="card">
-          <div class="card-title"><span>🗺️</span> Localização no Mapa</div>
+          <div class="card-title"><span>ðºï¸</span> LocalizaÃ§Ã£o no Mapa</div>
           <div id="map"></div>
           <p style="font-size:11px;color:var(--text2);margin-top:8px;">
-            Clique no mapa para definir coordenadas precisas, ou informe o endereço acima.
+            Clique no mapa para definir coordenadas precisas, ou informe o endereÃ§o acima.
           </p>
         </div>
       </div>
@@ -309,22 +307,22 @@ textarea{resize:vertical;min-height:72px;}
       <div class="panel" id="panel-topography">
         <div id="topoContent">
           <div class="empty-state">
-            <div class="empty-icon">⛰️</div>
+            <div class="empty-icon">â°ï¸</div>
             <p>Cadastre e analise o terreno primeiro.</p>
           </div>
         </div>
       </div>
 
-      <!-- IMPLANTAÇÃO -->
+      <!-- IMPLANTAÃÃO -->
       <div class="panel" id="panel-implantation">
         <div class="card">
-          <div class="card-title"><span>🗺️</span> Gerar Alternativas de Implantação</div>
+          <div class="card-title"><span>ðºï¸</span> Gerar Alternativas de ImplantaÃ§Ã£o</div>
           <div class="form-grid cols3">
             <div class="form-group">
               <label>Tipologia</label>
               <select id="implTypology">
-                <option value="condominio_loteamento">Condomínio / Loteamento</option>
-                <option value="condominio_fechado">Condomínio Fechado</option>
+                <option value="condominio_loteamento">CondomÃ­nio / Loteamento</option>
+                <option value="condominio_fechado">CondomÃ­nio Fechado</option>
                 <option value="loteamento_aberto">Loteamento Aberto</option>
                 <option value="pousada">Pousada</option>
                 <option value="hotel">Hotel</option>
@@ -332,41 +330,41 @@ textarea{resize:vertical;min-height:72px;}
               </select>
             </div>
             <div class="form-group">
-              <label>Nº de Lotes / Unidades desejado</label>
+              <label>NÂº de Lotes / Unidades desejado</label>
               <input id="implLotes" type="number" placeholder="50" />
             </div>
             <div class="form-group">
-              <label>Área mínima por lote (m²)</label>
+              <label>Ãrea mÃ­nima por lote (mÂ²)</label>
               <input id="implAreaMin" type="number" placeholder="300" />
             </div>
             <div class="form-group">
-              <label>Área máxima por lote (m²)</label>
+              <label>Ãrea mÃ¡xima por lote (mÂ²)</label>
               <input id="implAreaMax" type="number" placeholder="1000" />
             </div>
             <div class="form-group">
-              <label>Padrão</label>
+              <label>PadrÃ£o</label>
               <select id="implPadrao">
-                <option value="economico">Econômico</option>
-                <option value="medio" selected>Médio</option>
-                <option value="alto">Alto Padrão</option>
+                <option value="economico">EconÃ´mico</option>
+                <option value="medio" selected>MÃ©dio</option>
+                <option value="alto">Alto PadrÃ£o</option>
                 <option value="luxo">Luxo</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Área para equipamentos/clube</label>
+              <label>Ãrea para equipamentos/clube</label>
               <select id="implEquip">
-                <option value="minimo">Mínimo (guarita)</option>
-                <option value="basico" selected>Básico (piscina + salão)</option>
+                <option value="minimo">MÃ­nimo (guarita)</option>
+                <option value="basico" selected>BÃ¡sico (piscina + salÃ£o)</option>
                 <option value="completo">Completo (clube completo)</option>
               </select>
             </div>
           </div>
           <div class="form-group full" style="margin-top:12px">
-            <label>Observações / Requisitos especiais</label>
-            <textarea id="implNotes" placeholder="Vista para o vale, trilhas ecológicas, foco em sustentabilidade..."></textarea>
+            <label>ObservaÃ§Ãµes / Requisitos especiais</label>
+            <textarea id="implNotes" placeholder="Vista para o vale, trilhas ecolÃ³gicas, foco em sustentabilidade..."></textarea>
           </div>
           <button class="btn btn-primary" onclick="generateImplantations()" style="margin-top:12px" id="btnGenImpl">
-            🤖 Gerar Alternativas com IA
+            ð¤ Gerar Alternativas com IA
           </button>
         </div>
         <div id="implantationResults"></div>
@@ -375,14 +373,14 @@ textarea{resize:vertical;min-height:72px;}
       <!-- FINANCEIRO -->
       <div class="panel" id="panel-financial">
         <div class="card">
-          <div class="card-title"><span>💰</span> Análise de Viabilidade Financeira</div>
+          <div class="card-title"><span>ð°</span> AnÃ¡lise de Viabilidade Financeira</div>
           <div class="form-grid">
             <div class="form-group">
-              <label>Custo do terreno (R$) — 0 = estimar pela IA</label>
+              <label>Custo do terreno (R$) â 0 = estimar pela IA</label>
               <input id="finTerrenoValor" type="number" placeholder="0" />
             </div>
             <div class="form-group">
-              <label>Cenário de análise</label>
+              <label>CenÃ¡rio de anÃ¡lise</label>
               <select id="finCenario">
                 <option value="base">Base (mercado atual)</option>
                 <option value="otimista">Otimista (+15%)</option>
@@ -391,7 +389,7 @@ textarea{resize:vertical;min-height:72px;}
             </div>
           </div>
           <button class="btn btn-primary" onclick="analyzeFinancial()" style="margin-top:12px" id="btnFinancial">
-            📊 Calcular Viabilidade
+            ð Calcular Viabilidade
           </button>
         </div>
         <div id="financialResults"></div>
@@ -400,38 +398,18 @@ textarea{resize:vertical;min-height:72px;}
       <!-- 3D VIEWER -->
       <div class="panel" id="panel-viewer3d">
         <div class="card">
-          <div class="card-title"><span>🎯</span> Visualização 3D</div>
+          <div class="card-title"><span>ð¯</span> VisualizaÃ§Ã£o 3D</div>
           <canvas id="canvas3d"></canvas>
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn btn-outline" onclick="scene3D.rotation.y+=0.3">↻ Rotacionar</button>
-            <button class="btn btn-outline" onclick="zoom3D(1.2)">🔍 Zoom +</button>
-            <button class="btn btn-outline" onclick="zoom3D(0.8)">🔍 Zoom -</button>
-            <button class="btn btn-outline" onclick="reset3D()">⟳ Reset</button>
-            <button class="btn btn-outline" onclick="reload3D()">🔄 Recarregar Terreno</button>
+            <button class="btn btn-outline" onclick="scene3D.rotation.y+=0.3">â» Rotacionar</button>
+            <button class="btn btn-outline" onclick="zoom3D(1.2)">ð Zoom +</button>
+            <button class="btn btn-outline" onclick="zoom3D(0.8)">ð Zoom -</button>
+            <button class="btn btn-outline" onclick="reset3D()">â³ Reset</button>
           </div>
           <p style="font-size:11px;color:var(--text2);margin-top:8px;">
-            Arraste para rotacionar • Scroll para zoom • Lotes posicionados sobre o relevo real
+            Arraste para rotacionar â¢ Scroll para zoom
           </p>
         </div>
-      </div>
-
-      <!-- RELATÓRIO -->
-      <div class="panel" id="panel-relatorio">
-        <div class="card">
-          <div class="card-title"><span>📄</span> Relatório de Viabilidade</div>
-          <p style="color:var(--text2);font-size:13px;margin-bottom:16px">
-            Gera um PDF executivo com análise topográfica, implantação selecionada e viabilidade financeira.
-          </p>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="generateReport()" id="btnReport">
-              📋 Gerar Relatório PDF
-            </button>
-            <a id="pdfDownload" style="display:none" class="btn btn-outline" download="relatorio.pdf">
-              ⬇ Baixar PDF
-            </a>
-          </div>
-        </div>
-        <div id="reportPreview"></div>
       </div>
 
     </div><!-- /panels -->
@@ -441,11 +419,11 @@ textarea{resize:vertical;min-height:72px;}
 <!-- MODAL NOVO PROJETO -->
 <div class="modal-overlay" id="newProjectModal">
   <div class="modal">
-    <h2>🏗️ Novo Projeto</h2>
+    <h2>ðï¸ Novo Projeto</h2>
     <div class="form-grid">
       <div class="form-group full">
         <label>Nome do Projeto *</label>
-        <input id="newProjectName" placeholder="Ex: Condomínio Serra Verde" />
+        <input id="newProjectName" placeholder="Ex: CondomÃ­nio Serra Verde" />
       </div>
       <div class="form-group">
         <label>Cliente</label>
@@ -454,7 +432,7 @@ textarea{resize:vertical;min-height:72px;}
       <div class="form-group">
         <label>Tipologia</label>
         <select id="newProjectTypology">
-          <option value="condominio_loteamento">Condomínio / Loteamento</option>
+          <option value="condominio_loteamento">CondomÃ­nio / Loteamento</option>
           <option value="residencial_unifamiliar">Residencial Unifamiliar</option>
           <option value="pousada_hotel">Pousada / Hotel</option>
           <option value="comercial">Comercial</option>
@@ -463,8 +441,8 @@ textarea{resize:vertical;min-height:72px;}
         </select>
       </div>
       <div class="form-group full">
-        <label>Descrição</label>
-        <textarea id="newProjectDesc" placeholder="Descrição do empreendimento..."></textarea>
+        <label>DescriÃ§Ã£o</label>
+        <textarea id="newProjectDesc" placeholder="DescriÃ§Ã£o do empreendimento..."></textarea>
       </div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
@@ -475,13 +453,13 @@ textarea{resize:vertical;min-height:72px;}
 </div>
 
 <script>
-const API = '';
+const API = '';  // mesmo servidor
 let currentProject = null;
 let map = null;
 let marker = null;
 let scene3D, camera3D, renderer3D, animId;
 
-// ── INIT ─────────────────────────────────────────────────────────────────
+// ââ INIT âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
@@ -489,36 +467,66 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initMap() {
-  map = L.map('map').setView([-22.5, -44.5], 10);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
-    maxZoom: 19,
-  }).addTo(map);
-  map.on('click', e => {
-    const {lat, lng} = e.latlng;
+  // Para terreno 3D real: registre-se grÃ¡tis em ion.cesium.com e cole o token abaixo
+  // Cesium.Ion.defaultAccessToken = 'SEU_TOKEN_AQUI';
+
+  map = new Cesium.Viewer('map', {
+    baseLayerPicker: false,
+    geocoder: false,
+    homeButton: false,
+    sceneModePicker: false,
+    navigationHelpButton: false,
+    animation: false,
+    timeline: false,
+    fullscreenButton: false,
+    infoBox: false,
+    selectionIndicator: false,
+    imageryProvider: new Cesium.UrlTemplateImageryProvider({
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      credit: 'Â© Esri, Maxar, Earthstar Geographics'
+    }),
+    terrainProvider: new Cesium.EllipsoidTerrainProvider()
+  });
+
+  // Esconde crÃ©ditos padrÃ£o do Cesium
+  try { map.cesiumWidget.creditContainer.style.display = 'none'; } catch(e) {}
+
+  // PosiÃ§Ã£o inicial â Brasil centro
+  map.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(-44.5, -22.5, 800000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 },
+    duration: 0
+  });
+
+  // Clique para capturar coordenadas
+  const handler = new Cesium.ScreenSpaceEventHandler(map.scene.canvas);
+  handler.setInputAction(function(click) {
+    const cartesian = map.camera.pickEllipsoid(click.position, map.scene.globe.ellipsoid);
+    if (!cartesian) return;
+    const carto = Cesium.Cartographic.fromCartesian(cartesian);
+    const lat = Cesium.Math.toDegrees(carto.latitude);
+    const lng = Cesium.Math.toDegrees(carto.longitude);
     document.getElementById('terrainLat').value = lat.toFixed(6);
     document.getElementById('terrainLon').value = lng.toFixed(6);
-    if (marker) map.removeLayer(marker);
-    marker = L.marker([lat, lng]).addTo(map)
-              .bindPopup(`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`).openPopup();
-  });
+    _placeMapMarker(lat, lng, null, null);
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 }
 
-// ── PROJECTS ─────────────────────────────────────────────────────────────
+// ââ PROJECTS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 async function loadProjects() {
   const res = await fetch(`${API}/api/projects`);
   const projects = await res.json();
   const list = document.getElementById('projectList');
   if (!projects.length) {
-    list.innerHTML = `<div class="empty-state" style="padding:20px"><div class="empty-icon">📁</div><small>Nenhum projeto ainda</small></div>`;
+    list.innerHTML = `<div class="empty-state" style="padding:20px"><div class="empty-icon">ð</div><small>Nenhum projeto ainda</small></div>`;
     return;
   }
   list.innerHTML = projects.map(p => `
     <div class="project-item ${currentProject?.id === p.id ? 'active' : ''}"
          onclick="selectProject(${p.id})">
       <div class="project-name">${p.name}</div>
-      <div class="project-meta">${p.typology || ''} · ${p.client || ''}</div>
+      <div class="project-meta">${p.typology || ''} Â· ${p.client || ''}</div>
       <span class="status-badge status-${p.status}">${p.status}</span>
     </div>
   `).join('');
@@ -539,31 +547,30 @@ function renderOverview() {
   const steps = [
     {name:'Terreno',     done: p.has_terrain,      tab:'terrain'},
     {name:'Topografia',  done: p.has_topography,   tab:'topography'},
-    {name:'Implantação', done: p.has_implantation, tab:'implantation'},
+    {name:'ImplantaÃ§Ã£o', done: p.has_implantation, tab:'implantation'},
     {name:'Viabilidade', done: p.has_financial,    tab:'financial'},
   ];
   document.getElementById('overviewContent').innerHTML = `
     <div class="card">
-      <div class="card-title"><span>📊</span> ${p.name}</div>
+      <div class="card-title"><span>ð</span> ${p.name}</div>
       <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
-        <div><label style="color:var(--text2);font-size:11px">CLIENTE</label><div>${p.client || '—'}</div></div>
-        <div><label style="color:var(--text2);font-size:11px">TIPOLOGIA</label><div>${p.typology || '—'}</div></div>
+        <div><label style="color:var(--text2);font-size:11px">CLIENTE</label><div>${p.client || 'â'}</div></div>
+        <div><label style="color:var(--text2);font-size:11px">TIPOLOGIA</label><div>${p.typology || 'â'}</div></div>
         <div><label style="color:var(--text2);font-size:11px">STATUS</label>
           <span class="status-badge status-${p.status}">${p.status}</span></div>
       </div>
       <div class="progress-steps">
         ${steps.map(s => `
           <div class="step ${s.done ? 'done' : ''}" onclick="showTab('${s.tab}');scrollTo(0,0)" style="cursor:pointer">
-            ${s.done ? '✅' : '⭕'} ${s.name}
+            ${s.done ? 'â' : 'â­'} ${s.name}
           </div>
         `).join('')}
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
         ${!p.has_terrain ? `<button class="btn btn-primary" onclick="showTab('terrain')">+ Cadastrar Terreno</button>` : ''}
         ${p.has_terrain && !p.has_topography ? `<button class="btn btn-primary" onclick="showTab('terrain')">+ Analisar Topografia</button>` : ''}
-        ${p.has_topography && !p.has_implantation ? `<button class="btn btn-primary" onclick="showTab('implantation')">+ Gerar Implantação</button>` : ''}
+        ${p.has_topography && !p.has_implantation ? `<button class="btn btn-primary" onclick="showTab('implantation')">+ Gerar ImplantaÃ§Ã£o</button>` : ''}
         ${p.has_implantation && !p.has_financial ? `<button class="btn btn-primary" onclick="showTab('financial')">+ Analisar Viabilidade</button>` : ''}
-        ${p.has_financial ? `<button class="btn btn-outline" onclick="showTab('relatorio')">📄 Gerar Relatório</button>` : ''}
       </div>
     </div>
     <div style="color:var(--text2);font-size:12px;padding:4px 0">
@@ -572,7 +579,7 @@ function renderOverview() {
   `;
 }
 
-// ── MODAL ────────────────────────────────────────────────────────────────
+// ââ MODAL ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function openNewProjectModal() {
   document.getElementById('newProjectModal').classList.add('open');
@@ -600,7 +607,7 @@ async function createProject() {
   await selectProject(p.id);
 }
 
-// ── TABS ─────────────────────────────────────────────────────────────────
+// ââ TABS âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -609,7 +616,6 @@ function showTab(name) {
   document.getElementById(`panel-${name}`).classList.add('active');
   if (name === 'topography' && currentProject?.has_topography) loadTopography();
   if (name === 'terrain' && currentProject?.has_terrain) loadTerrainForm();
-  if (name === 'financial' && currentProject?.has_financial) loadFinancial();
 }
 
 async function loadTerrainForm() {
@@ -630,6 +636,7 @@ async function loadTerrainForm() {
     if (t.vegetacao) document.getElementById('terrainVeg').value = t.vegetacao;
     if (t.acesso) document.getElementById('terrainAcesso').value = t.acesso;
     if (t.zoneamento) document.getElementById('terrainNotes').value = t.zoneamento;
+    // infraestrutura
     const infra = t.infraestrutura || [];
     document.querySelectorAll('.infra-cb').forEach(cb => {
       cb.checked = infra.includes(cb.value);
@@ -640,7 +647,7 @@ async function loadTerrainForm() {
   } catch(e) {}
 }
 
-// ── TERRAIN ──────────────────────────────────────────────────────────────
+// ââ TERRAIN ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function _getTerrainPayload() {
   const infra = [...document.querySelectorAll('.infra-cb:checked')].map(c => c.value);
@@ -662,26 +669,65 @@ function _getTerrainPayload() {
 }
 
 function _placeMapMarker(lat, lon, address, area_m2) {
-  if (!lat) return;
-  map.setView([lat, lon], 13);
-  if (marker) map.removeLayer(marker);
-  marker = L.marker([lat, lon]).addTo(map)
-            .bindPopup('📍 ' + (address || '')).openPopup();
+  if (!lat || !map) return;
+
+  // Voa para o local com Ã¢ngulo inclinado (estilo Google Earth)
+  map.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(lon, lat, 8000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-45), roll: 0 }
+  });
+
+  // Remove entidades anteriores
+  map.entities.removeAll();
+
+  // Marker principal
+  marker = map.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(lon, lat),
+    point: {
+      pixelSize: 14,
+      color: Cesium.Color.fromCssColorString('#4fc3f7'),
+      outlineColor: Cesium.Color.WHITE,
+      outlineWidth: 2,
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+    },
+    label: {
+      text: address ? address : `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+      font: '13px Segoe UI, sans-serif',
+      fillColor: Cesium.Color.WHITE,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      outlineWidth: 2,
+      outlineColor: Cesium.Color.BLACK,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -20),
+      heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+    }
+  });
+
+  // Elipse para Ã¡rea estimada do terreno
   if (area_m2) {
     const raio = Math.sqrt(area_m2 / Math.PI);
-    L.circle([lat, lon], {
-      radius: raio, color: '#4fc3f7', fillColor:'#4fc3f7', fillOpacity:0.1, weight:2
-    }).addTo(map);
+    map.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat),
+      ellipse: {
+        semiMinorAxis: raio,
+        semiMajorAxis: raio,
+        material: Cesium.Color.fromCssColorString('#4fc3f7').withAlpha(0.15),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#4fc3f7'),
+        outlineWidth: 2,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+      }
+    });
   }
 }
 
 async function saveTerrain() {
   if (!currentProject) { alert('Selecione um projeto primeiro'); return; }
   const payload = _getTerrainPayload();
-  if (!payload.area_ha) { alert('Informe a área do terreno'); return; }
+  if (!payload.area_ha) { alert('Informe a Ã¡rea do terreno'); return; }
 
   const btn = document.getElementById('btnSaveTerrain');
-  btn.textContent = '⏳ Salvando...';
+  btn.textContent = 'â³ Salvando...';
   btn.disabled = true;
 
   try {
@@ -697,11 +743,11 @@ async function saveTerrain() {
       currentProject = await r.json();
       renderOverview();
     }
-    btn.textContent = '✅ Salvo!';
-    setTimeout(() => { btn.textContent = '💾 Salvar e Localizar'; }, 2000);
+    btn.textContent = 'â Salvo!';
+    setTimeout(() => { btn.textContent = 'ð¾ Salvar e Localizar'; }, 2000);
   } catch(e) {
     alert('Erro ao salvar: ' + e.message);
-    btn.textContent = '💾 Salvar e Localizar';
+    btn.textContent = 'ð¾ Salvar e Localizar';
   }
   btn.disabled = false;
 }
@@ -709,14 +755,16 @@ async function saveTerrain() {
 async function analyzeTerrain() {
   if (!currentProject) { alert('Selecione um projeto primeiro'); return; }
 
+  // Salva primeiro se ainda nÃ£o salvou
   const payload = _getTerrainPayload();
-  if (!payload.area_ha) { alert('Informe a área do terreno'); return; }
+  if (!payload.area_ha) { alert('Informe a Ã¡rea do terreno'); return; }
 
   const btn = document.getElementById('btnAnalyzeTerrain');
-  btn.textContent = '⏳ Salvando terreno...';
+  btn.textContent = 'â³ Salvando terreno...';
   btn.disabled = true;
 
   try {
+    // Passo 1: salvar
     const saveRes = await fetch(`${API}/api/terrain/save`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
@@ -724,7 +772,8 @@ async function analyzeTerrain() {
     const saveData = await saveRes.json();
     _placeMapMarker(saveData.lat, saveData.lon, saveData.address, saveData.area_m2);
 
-    btn.textContent = '🤖 Analisando com IA (~30s)...';
+    // Passo 2: analisar com IA
+    btn.textContent = 'ð¤ Analisando com IA (~30s)...';
     const analyzeRes = await fetch(`${API}/api/terrain/analyze`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({project_id: currentProject.id})
@@ -741,31 +790,14 @@ async function analyzeTerrain() {
       }
       showTab('topography');
     } else {
-      alert('Erro na análise: ' + (data.detail || JSON.stringify(data)));
+      alert('Erro na anÃ¡lise: ' + (data.detail || JSON.stringify(data)));
     }
   } catch(e) {
-    alert('Erro na análise: ' + e.message);
+    alert('Erro na anÃ¡lise: ' + e.message);
   }
 
-  btn.textContent = '🤖 Analisar com IA';
+  btn.textContent = 'ð¤ Analisar com IA';
   btn.disabled = false;
-}
-
-async function loadFinancial() {
-  if (!currentProject) return;
-  try {
-    const res = await fetch(API + '/api/financial/' + currentProject.id);
-    if (!res.ok) return;
-    const d = await res.json();
-    renderFinancialResults({
-      resultado: {lucro_bruto: d.lucro_bruto, margem_bruta_percent: d.margem_bruta, payback_meses: d.payback_meses},
-      receitas: {vgv_total: d.vgv},
-      custos: {},
-      cenarios: d.cenarios || {},
-      recomendacoes_financeiras: [],
-      alertas: [],
-    });
-  } catch(e) {}
 }
 
 async function loadTopography() {
@@ -774,6 +806,7 @@ async function loadTopography() {
     const res = await fetch(`${API}/api/terrain/${currentProject.id}`);
     const data = await res.json();
     if (data.topography) {
+      // Reconstituir resultado para renderizar
       renderTopographyResults({
         terrain: data.terrain,
         topography: {
@@ -796,61 +829,61 @@ function renderTopographyResults(data) {
   const topo = data.topography;
   const ia = data.ia || {};
   const area_util_pct = topo.area_util_m2 && data.terrain
-    ? Math.round(topo.area_util_m2 / data.terrain.area_m2 * 100) : '—';
+    ? Math.round(topo.area_util_m2 / data.terrain.area_m2 * 100) : 'â';
 
-  const pontos = (ia.pontos_fortes || []).map(p => `<span class="tag tag-good">✓ ${p}</span>`).join('');
-  const restricoes = (ia.restricoes || []).map(r => `<span class="tag tag-warn">⚠ ${r}</span>`).join('');
-  const recomendacoes = (ia.recomendacoes || []).map(r => `<span class="tag tag-good">→ ${r}</span>`).join('');
+  const pontos = (ia.pontos_fortes || []).map(p => `<span class="tag tag-good">â ${p}</span>`).join('');
+  const restricoes = (ia.restricoes || []).map(r => `<span class="tag tag-warn">â  ${r}</span>`).join('');
+  const recomendacoes = (ia.recomendacoes || []).map(r => `<span class="tag tag-good">â ${r}</span>`).join('');
 
   document.getElementById('topoContent').innerHTML = `
     <div class="topo-metrics">
       <div class="metric-card">
-        <div class="metric-value">${topo.desnivel || '—'}m</div>
-        <div class="metric-label">Desnível Total</div>
+        <div class="metric-value">${topo.desnivel || 'â'}m</div>
+        <div class="metric-label">DesnÃ­vel Total</div>
       </div>
       <div class="metric-card">
-        <div class="metric-value">${topo.decl_media || '—'}%</div>
-        <div class="metric-label">Declividade Média</div>
+        <div class="metric-value">${topo.decl_media || 'â'}%</div>
+        <div class="metric-label">Declividade MÃ©dia</div>
       </div>
       <div class="metric-card">
-        <div class="metric-value">${topo.orientacao_predominante || '—'}</div>
-        <div class="metric-label">Orientação</div>
+        <div class="metric-value">${topo.orientacao_predominante || 'â'}</div>
+        <div class="metric-label">OrientaÃ§Ã£o</div>
       </div>
       <div class="metric-card">
         <div class="metric-value">${area_util_pct}%</div>
-        <div class="metric-label">Área Útil</div>
+        <div class="metric-label">Ãrea Ãtil</div>
       </div>
     </div>
 
     ${topo.img_topografia ? `
     <div class="card">
-      <div class="card-title"><span>🗺️</span> Análise Topográfica</div>
+      <div class="card-title"><span>ðºï¸</span> AnÃ¡lise TopogrÃ¡fica</div>
       <img class="img-result" src="${topo.img_topografia}" alt="Topografia">
     </div>` : ''}
 
     ${topo.img_zonas ? `
     <div class="card">
-      <div class="card-title"><span>📊</span> Distribuição de Declividade</div>
+      <div class="card-title"><span>ð</span> DistribuiÃ§Ã£o de Declividade</div>
       <img class="img-result" src="${topo.img_zonas}" alt="Declividade">
     </div>` : ''}
 
     <div class="ia-card">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
         <div>
-          <div class="ia-score">${ia.pontuacao_geral || '—'}</div>
+          <div class="ia-score">${ia.pontuacao_geral || 'â'}</div>
           <div class="ia-label">Score do Terreno</div>
         </div>
         <div style="flex:1">
-          <p style="font-size:13px;line-height:1.6">${ia.resumo || 'Análise não disponível'}</p>
+          <p style="font-size:13px;line-height:1.6">${ia.resumo || 'AnÃ¡lise nÃ£o disponÃ­vel'}</p>
         </div>
       </div>
       ${pontos ? `<div><p style="font-size:11px;color:var(--text2);margin-bottom:6px">PONTOS FORTES</p><div class="tag-list">${pontos}</div></div>` : ''}
-      ${restricoes ? `<div style="margin-top:10px"><p style="font-size:11px;color:var(--text2);margin-bottom:6px">RESTRIÇÕES</p><div class="tag-list">${restricoes}</div></div>` : ''}
-      ${recomendacoes ? `<div style="margin-top:10px"><p style="font-size:11px;color:var(--text2);margin-bottom:6px">RECOMENDAÇÕES</p><div class="tag-list">${recomendacoes}</div></div>` : ''}
+      ${restricoes ? `<div style="margin-top:10px"><p style="font-size:11px;color:var(--text2);margin-bottom:6px">RESTRIÃÃES</p><div class="tag-list">${restricoes}</div></div>` : ''}
+      ${recomendacoes ? `<div style="margin-top:10px"><p style="font-size:11px;color:var(--text2);margin-bottom:6px">RECOMENDAÃÃES</p><div class="tag-list">${recomendacoes}</div></div>` : ''}
 
       ${ia.tipo_fundacao_recomendado ? `
       <div style="margin-top:12px;font-size:12px">
-        <strong>Fundação recomendada:</strong> <span style="color:var(--text2)">${ia.tipo_fundacao_recomendado}</span>
+        <strong>FundaÃ§Ã£o recomendada:</strong> <span style="color:var(--text2)">${ia.tipo_fundacao_recomendado}</span>
       </div>` : ''}
       ${ia.melhor_posicionamento ? `
       <div style="margin-top:6px;font-size:12px">
@@ -860,12 +893,12 @@ function renderTopographyResults(data) {
   `;
 }
 
-// ── IMPLANTAÇÃO ──────────────────────────────────────────────────────────
+// ââ IMPLANTAÃÃO ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 async function generateImplantations() {
   if (!currentProject) { alert('Selecione um projeto'); return; }
   const btn = document.getElementById('btnGenImpl');
-  btn.textContent = '⏳ Gerando alternativas...';
+  btn.textContent = 'â³ Gerando alternativas...';
   btn.disabled = true;
 
   const payload = {
@@ -891,7 +924,7 @@ async function generateImplantations() {
     await loadProjects();
   } catch(e) { alert('Erro: ' + e.message); }
 
-  btn.textContent = '🤖 Gerar Alternativas com IA';
+  btn.textContent = 'ð¤ Gerar Alternativas com IA';
   btn.disabled = false;
 }
 
@@ -899,30 +932,30 @@ function renderImplantationResults(data) {
   const alts = data.alternativas || [];
   document.getElementById('implantationResults').innerHTML = `
     <div class="card">
-      <div class="card-title"><span>🏗️</span> Alternativas de Implantação</div>
+      <div class="card-title"><span>ðï¸</span> Alternativas de ImplantaÃ§Ã£o</div>
       ${data.recomendacao ? `<div class="ia-card" style="margin-bottom:16px">
-        <p style="font-size:13px">💡 <strong>Recomendação IA:</strong> ${data.recomendacao}</p>
+        <p style="font-size:13px">ð¡ <strong>RecomendaÃ§Ã£o IA:</strong> ${data.recomendacao}</p>
       </div>` : ''}
       <div class="alternatives-grid">
         ${alts.map(alt => `
           <div class="alt-card" id="alt-${alt.id}" onclick="selectAlt(${alt.id})">
             <div class="alt-name">${alt.nome}</div>
             <p style="font-size:12px;color:var(--text2);margin-bottom:10px">${alt.descricao || ''}</p>
-            <div class="alt-score">${alt.scores?.viabilidade || '—'}<span style="font-size:14px;color:var(--text2)">/10</span></div>
+            <div class="alt-score">${alt.scores?.viabilidade || 'â'}<span style="font-size:14px;color:var(--text2)">/10</span></div>
             <div class="alt-stats">
-              <div class="alt-stat"><strong>${alt.num_lotes || '—'}</strong>Lotes</div>
-              <div class="alt-stat"><strong>${alt.area_media_lote ? Math.round(alt.area_media_lote)+'m²' : '—'}</strong>Área média</div>
-              <div class="alt-stat"><strong>${alt.scores?.tecnico || '—'}</strong>Técnico</div>
-              <div class="alt-stat"><strong>${alt.scores?.ambiental || '—'}</strong>Ambiental</div>
+              <div class="alt-stat"><strong>${alt.num_lotes || 'â'}</strong>Lotes</div>
+              <div class="alt-stat"><strong>${alt.area_media_lote ? Math.round(alt.area_media_lote)+'mÂ²' : 'â'}</strong>Ãrea mÃ©dia</div>
+              <div class="alt-stat"><strong>${alt.scores?.tecnico || 'â'}</strong>TÃ©cnico</div>
+              <div class="alt-stat"><strong>${alt.scores?.ambiental || 'â'}</strong>Ambiental</div>
             </div>
             ${alt.custo_estimado ? `<div style="margin-top:10px;font-size:11px;color:var(--warn)">Infraest.: ${alt.custo_estimado}</div>` : ''}
             ${alt.vgv_estimado ? `<div style="font-size:11px;color:var(--success)">VGV: ${alt.vgv_estimado}</div>` : ''}
             <div style="margin-top:8px">
-              ${(alt.vantagens||[]).map(v=>`<div style="font-size:11px;color:var(--success)">✓ ${v}</div>`).join('')}
-              ${(alt.desvantagens||[]).map(v=>`<div style="font-size:11px;color:var(--warn)">⚠ ${v}</div>`).join('')}
+              ${(alt.vantagens||[]).map(v=>`<div style="font-size:11px;color:var(--success)">â ${v}</div>`).join('')}
+              ${(alt.desvantagens||[]).map(v=>`<div style="font-size:11px;color:var(--warn)">â  ${v}</div>`).join('')}
             </div>
-            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="event.stopPropagation();selectAlt(${alt.id})">
-              Selecionar esta opção
+            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="selectAlt(${alt.id})">
+              Selecionar esta opÃ§Ã£o
             </button>
           </div>
         `).join('')}
@@ -944,20 +977,14 @@ async function selectAlt(id) {
   const r = await fetch(`${API}/api/projects/${currentProject.id}`);
   currentProject = await r.json();
   renderOverview();
-  // Reset 3D so it reloads with new lote positions next time
-  if (renderer3D) {
-    renderer3D.dispose();
-    renderer3D = null;
-    scene3D = null;
-  }
 }
 
-// ── FINANCEIRO ──────────────────────────────────────────────────────────
+// ââ FINANCEIRO âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 async function analyzeFinancial() {
   if (!currentProject) { alert('Selecione um projeto'); return; }
   const btn = document.getElementById('btnFinancial');
-  btn.textContent = '⏳ Calculando...';
+  btn.textContent = 'â³ Calculando...';
   btn.disabled = true;
 
   try {
@@ -974,12 +1001,12 @@ async function analyzeFinancial() {
     await loadProjects();
   } catch(e) { alert('Erro: ' + e.message); }
 
-  btn.textContent = '📊 Calcular Viabilidade';
+  btn.textContent = 'ð Calcular Viabilidade';
   btn.disabled = false;
 }
 
 function fmt(n) {
-  if (!n) return '—';
+  if (!n) return 'â';
   return 'R$ ' + (n/1e6).toFixed(2) + 'M';
 }
 
@@ -1000,23 +1027,23 @@ function renderFinancialResults(data) {
         <div class="kpi-label">Lucro Bruto</div>
       </div>
       <div class="kpi">
-        <div class="kpi-value ${(res.margem_bruta_percent||0)>=20?'kpi-positive':'kpi-warn'}">${res.margem_bruta_percent || '—'}%</div>
+        <div class="kpi-value ${(res.margem_bruta_percent||0)>=20?'kpi-positive':'kpi-warn'}">${res.margem_bruta_percent || 'â'}%</div>
         <div class="kpi-label">Margem Bruta</div>
       </div>
       <div class="kpi">
-        <div class="kpi-value kpi-neutral">${res.payback_meses || '—'} meses</div>
+        <div class="kpi-value kpi-neutral">${res.payback_meses || 'â'} meses</div>
         <div class="kpi-label">Payback</div>
       </div>
     </div>
 
     ${data.img_financeiro ? `
     <div class="card">
-      <div class="card-title"><span>📈</span> Análise Financeira</div>
+      <div class="card-title"><span>ð</span> AnÃ¡lise Financeira</div>
       <img class="img-result" src="${data.img_financeiro}" alt="Financeiro">
     </div>` : ''}
 
     <div class="card">
-      <div class="card-title"><span>📊</span> Cenários</div>
+      <div class="card-title"><span>ð</span> CenÃ¡rios</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
         ${['pessimista','base','otimista'].map(c => {
           const s = cen[c] || {};
@@ -1025,7 +1052,7 @@ function renderFinancialResults(data) {
             <div style="font-size:15px;font-weight:700">${fmt(s.vgv)}</div>
             <div style="font-size:11px;color:var(--text2)">VGV</div>
             <div style="margin-top:6px;font-size:13px;color:${(s.margem||0)>=20?'var(--success)':'var(--warn)'}">
-              Margem: ${s.margem || '—'}%
+              Margem: ${s.margem || 'â'}%
             </div>
           </div>`;
         }).join('')}
@@ -1034,70 +1061,19 @@ function renderFinancialResults(data) {
 
     ${(data.recomendacoes_financeiras||[]).length ? `
     <div class="card">
-      <div class="card-title"><span>💡</span> Recomendações</div>
-      ${data.recomendacoes_financeiras.map(r=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">→ ${r}</div>`).join('')}
+      <div class="card-title"><span>ð¡</span> RecomendaÃ§Ãµes</div>
+      ${data.recomendacoes_financeiras.map(r=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">â ${r}</div>`).join('')}
     </div>` : ''}
 
     ${(data.alertas||[]).length ? `
     <div class="card" style="border-color:rgba(244,67,54,.3)">
-      <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Alertas</div>
-      ${data.alertas.map(a=>`<div style="padding:6px 0;font-size:13px;color:var(--warn)">⚠ ${a}</div>`).join('')}
+      <div class="card-title" style="color:var(--danger)"><span>â ï¸</span> Alertas</div>
+      ${data.alertas.map(a=>`<div style="padding:6px 0;font-size:13px;color:var(--warn)">â  ${a}</div>`).join('')}
     </div>` : ''}
   `;
 }
 
-// ── RELATÓRIO ──────────────────────────────────────────────────────────
-
-async function generateReport() {
-  if (!currentProject) { alert('Selecione um projeto'); return; }
-  const btn = document.getElementById('btnReport');
-  btn.textContent = '⏳ Gerando relatório...';
-  btn.disabled = true;
-  document.getElementById('reportPreview').innerHTML =
-    '<div class="loading"><div class="spinner"></div><span>Gerando PDF com IA (~30s)...</span></div>';
-
-  try {
-    const res = await fetch(`${API}/api/report/generate`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({project_id: currentProject.id})
-    });
-    const data = await res.json();
-
-    if (data.pdf_base64) {
-      const dlLink = document.getElementById('pdfDownload');
-      dlLink.href = 'data:application/pdf;base64,' + data.pdf_base64;
-      dlLink.download = (currentProject.name || 'relatorio').replace(/[^a-zA-Z0-9]/g,'_') + '.pdf';
-      dlLink.style.display = 'inline-block';
-
-      document.getElementById('reportPreview').innerHTML = `
-        <div class="card">
-          <div class="card-title"><span>✅</span> Relatório Gerado</div>
-          <div class="ia-card" style="margin-bottom:16px">
-            <p style="font-size:13px;line-height:1.7">${data.resumo_executivo || 'Resumo não disponível'}</p>
-          </div>
-          <iframe src="data:application/pdf;base64,${data.pdf_base64}"
-            style="width:100%;height:520px;border:1px solid var(--border);border-radius:var(--radius)">
-          </iframe>
-        </div>
-      `;
-    } else {
-      document.getElementById('reportPreview').innerHTML = `
-        <div class="card" style="border-color:rgba(244,67,54,.3)">
-          <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Erro ao gerar PDF</div>
-          <pre style="font-size:10px;color:var(--text2);overflow:auto;max-height:200px">${data.debug_pdf_error || 'Desconhecido'}</pre>
-        </div>`;
-    }
-  } catch(e) {
-    document.getElementById('reportPreview').innerHTML =
-      `<div class="card"><p style="color:var(--danger)">Erro: ${e.message}</p></div>`;
-  }
-
-  btn.textContent = '📋 Gerar Relatório PDF';
-  btn.disabled = false;
-}
-
-// ── 3D ──────────────────────────────────────────────────────────────────
+// ââ 3D âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 function init3D() {
   const canvas = document.getElementById('canvas3d');
@@ -1111,206 +1087,4 @@ function init3D() {
   camera3D.lookAt(0, 0, 0);
 
   renderer3D = new THREE.WebGLRenderer({canvas, antialias: true});
-  renderer3D.setSize(canvas.clientWidth, canvas.clientHeight);
-  renderer3D.shadowMap.enabled = true;
-
-  // Luzes
-  scene3D.add(new THREE.AmbientLight(0xffffff, 0.5));
-  const dir = new THREE.DirectionalLight(0xffffff, 1);
-  dir.position.set(20, 30, 20);
-  dir.castShadow = true;
-  scene3D.add(dir);
-
-  // Grid
-  scene3D.add(new THREE.GridHelper(60, 30, 0x1e2340, 0x1e2340));
-
-  // Load real terrain or fallback
-  if (currentProject) {
-    _loadRealTerrain();
-  } else {
-    _add3DExample();
-  }
-
-  // Mouse rotate
-  let isDragging = false, prevX, prevY;
-  canvas.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; });
-  canvas.addEventListener('mouseup', () => isDragging = false);
-  canvas.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    const dx = e.clientX - prevX, dy = e.clientY - prevY;
-    scene3D.rotation.y += dx * 0.01;
-    scene3D.rotation.x += dy * 0.01;
-    prevX = e.clientX; prevY = e.clientY;
-  });
-  canvas.addEventListener('wheel', e => { camera3D.position.multiplyScalar(1 + e.deltaY * 0.001); });
-
-  function animate() {
-    animId = requestAnimationFrame(animate);
-    renderer3D.render(scene3D, camera3D);
-  }
-  animate();
-}
-
-function reload3D() {
-  if (!scene3D) return;
-  // Clear meshes, keep lights and grid
-  const toRemove = [];
-  scene3D.traverse(obj => {
-    if (obj.isMesh || (obj.isLineSegments && !(obj instanceof THREE.GridHelper))) {
-      toRemove.push(obj);
-    }
-  });
-  toRemove.forEach(o => { scene3D.remove(o); if (o.geometry) o.geometry.dispose(); });
-  if (currentProject) {
-    _loadRealTerrain();
-  } else {
-    _add3DExample();
-  }
-}
-
-async function _loadRealTerrain() {
-  if (!currentProject) { _add3DExample(); return; }
-  try {
-    const res = await fetch(`${API}/api/terrain/${currentProject.id}/elevation`);
-    if (!res.ok) throw new Error('API error');
-    const data = await res.json();
-    if (data.elevation_grid && data.elevation_grid.elevations) {
-      _buildRealTerrain(data);
-    } else {
-      _add3DExample();
-    }
-  } catch(e) {
-    console.warn('3D terrain load failed, using example:', e);
-    _add3DExample();
-  }
-}
-
-function _buildRealTerrain(data) {
-  const SIZE  = 40;
-  const SCALE = 8;
-  const grid  = data.elevation_grid;
-  const n     = grid.n || 10;
-
-  // Flatten elevations
-  const flat = Array.isArray(grid.elevations[0])
-    ? grid.elevations.flat()
-    : grid.elevations;
-  const minE  = Math.min(...flat);
-  const maxE  = Math.max(...flat);
-  const range = (maxE - minE) || 1;
-
-  // Helper: sample terrain height at normalized position (nx, nz) in [0,1]
-  function sampleH(nx, nz) {
-    const ri = Math.min(Math.floor(nz * (n - 1)), n - 1);
-    const ci = Math.min(Math.floor(nx * (n - 1)), n - 1);
-    const row = Array.isArray(grid.elevations[ri]) ? grid.elevations[ri][ci] : flat[ri * n + ci];
-    return ((row - minE) / range) * SCALE;
-  }
-
-  // Build terrain mesh with PlaneGeometry
-  const geo = new THREE.PlaneGeometry(SIZE, SIZE, n - 1, n - 1);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position.array;
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const idx = (i * n + j) * 3;
-      const row = Array.isArray(grid.elevations[i]) ? grid.elevations[i][j] : flat[i * n + j];
-      pos[idx + 1] = ((row - minE) / range) * SCALE;
-    }
-  }
-  geo.computeVertexNormals();
-
-  const mat = new THREE.MeshLambertMaterial({color: 0x4a5c3a});
-  scene3D.add(new THREE.Mesh(geo, mat));
-
-  // Wireframe overlay
-  const wgeo = geo.clone();
-  const wmat = new THREE.MeshBasicMaterial({color: 0x2d3a1e, wireframe: true, opacity: 0.25, transparent: true});
-  scene3D.add(new THREE.Mesh(wgeo, wmat));
-
-  // Place lotes
-  const lotes  = data.lotes || [];
-  const numL   = data.num_lotes || lotes.length || 0;
-  const colors = [0x4fc3f7, 0x81d4fa, 0x29b6f6, 0x039be5, 0x7c4dff, 0x9c6dff];
-  const LH     = 3; // lote box height
-
-  function placeBox(nx, nz, colorIdx) {
-    const terrH = sampleH(nx, nz);
-    const bx    = new THREE.BoxGeometry(3.5, LH, 3.5);
-    const bm    = new THREE.MeshLambertMaterial({
-      color: colors[colorIdx % colors.length], transparent: true, opacity: 0.85
-    });
-    const box = new THREE.Mesh(bx, bm);
-    box.position.set(
-      -SIZE / 2 + nx * SIZE,
-      terrH + LH / 2,
-      -SIZE / 2 + nz * SIZE
-    );
-    scene3D.add(box);
-    const edges = new THREE.EdgesGeometry(bx);
-    const line  = new THREE.LineSegments(
-      edges,
-      new THREE.LineBasicMaterial({color: 0x000000, opacity: 0.3, transparent: true})
-    );
-    line.position.copy(box.position);
-    scene3D.add(line);
-  }
-
-  if (lotes.length > 0) {
-    // Use real positions from API
-    lotes.forEach((l, i) => placeBox(l.x, l.z, i));
-  } else if (numL > 0) {
-    // Distribute evenly in a grid
-    const cols = Math.ceil(Math.sqrt(Math.min(numL, 30)));
-    const rows = Math.ceil(Math.min(numL, 30) / cols);
-    for (let i = 0; i < Math.min(numL, 30); i++) {
-      const c  = i % cols, r = Math.floor(i / cols);
-      const nx = (c + 1) / (cols + 1);
-      const nz = (r + 1) / (rows + 1);
-      placeBox(nx, nz, i);
-    }
-  }
-}
-
-function _add3DExample() {
-  // Placeholder flat terrain + example volumes
-  const geo = new THREE.BoxGeometry(40, 1, 30);
-  const mat = new THREE.MeshLambertMaterial({color: 0x4a5c3a});
-  const terrain = new THREE.Mesh(geo, mat);
-  terrain.position.y = -0.5;
-  scene3D.add(terrain);
-
-  const colors = [0x4fc3f7, 0x81d4fa, 0x29b6f6, 0x039be5];
-  for (let i = 0; i < 8; i++) {
-    const h = 2 + Math.random() * 4;
-    const g = new THREE.BoxGeometry(3, h, 4);
-    const m = new THREE.MeshLambertMaterial({color: colors[i % colors.length], transparent:true, opacity:.85});
-    const mesh = new THREE.Mesh(g, m);
-    mesh.position.set(-14 + (i % 4) * 8, h/2, -6 + Math.floor(i/4) * 10);
-    scene3D.add(mesh);
-    const edges = new THREE.EdgesGeometry(g);
-    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x000000, opacity:.3, transparent:true}));
-    line.position.copy(mesh.position);
-    scene3D.add(line);
-  }
-}
-
-function zoom3D(factor) {
-  if (camera3D) camera3D.position.multiplyScalar(factor);
-}
-
-function reset3D() {
-  if (!scene3D) return;
-  scene3D.rotation.set(0, 0, 0);
-  camera3D.position.set(30, 25, 30);
-  camera3D.lookAt(0, 0, 0);
-}
-
-// ── MODAL new project ──────────────────────────────────────────────────
-
-document.getElementById('newProjectModal').addEventListener('click', function(e) {
-  if (e.target === this) closeNewProjectModal();
-});
-</script>
-</body>
-</html>
+  re
