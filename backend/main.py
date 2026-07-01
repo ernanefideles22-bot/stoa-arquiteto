@@ -65,5 +65,8 @@ def root():
     return {"status": "STOA Civil API rodando", "docs": "/docs"}
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
+    # Disponivel em /health (rota dedicada no vercel.json) e /api/health
+    # (ja coberto pela rota /api/* existente) -- use qualquer um no monitoramento.
     return {"status": "ok", "version": "1.0.0"}
