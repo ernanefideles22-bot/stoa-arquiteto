@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
+import json
 
 from ..models.database import get_db, Project, Terrain, Topography, Implantation, Architecture, Financial
 from ..services import ai_engine, chart_service
@@ -110,7 +111,14 @@ async def analyze_financial(data: FinancialRequest, db: Session = Depends(get_db
     fin.payback_meses          = resultado.get("payback_meses")
     fin.fluxo_caixa            = result.get("fluxo_caixa_anual")
     fin.cronograma_obra        = result.get("cronograma_financeiro")
-    fin.analise_ia             = str(result.get("recomendacoes_financeiras", []))
+    # analise_ia guarda apenas o texto qualitativo da IA (recomendacoes + alertas),
+    # serializado como JSON de verdade. Os numeros (vgv, roi, margem, cenarios etc.)
+    # ficam nas colunas dedicadas abaixo -- e sao a fonte usada pelo gerador de PDF
+    # em report.py, para nao depender de round-trip de parsing deste campo texto.
+    fin.analise_ia             = json.dumps({
+        "recomendacoes_financeiras": result.get("recomendacoes_financeiras", []),
+        "alertas": result.get("alertas", []),
+    }, ensure_ascii=False)
     fin.cenarios               = result.get("cenarios")
 
     db.commit()

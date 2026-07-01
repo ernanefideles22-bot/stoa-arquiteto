@@ -28,8 +28,14 @@ class ProjectUpdate(BaseModel):
 
 @router.get("/debug-db")
 def debug_db():
-    """Endpoint temporario para diagnosticar conexao com DB"""
-    import os
+    """
+    Endpoint de diagnostico de conexao com o DB (Vercel/Supabase).
+    Desligado por padrao — so responde se ENABLE_DEBUG_ENDPOINTS=true no ambiente,
+    pra nao vazar detalhes de infraestrutura em producao.
+    """
+    if os.getenv("ENABLE_DEBUG_ENDPOINTS", "").lower() != "true":
+        raise HTTPException(status_code=404, detail="Not found")
+
     db_url = os.getenv("DATABASE_URL", "NOT SET")
     # Mascara a senha para log seguro
     masked = db_url[:20] + "..." if len(db_url) > 20 else db_url

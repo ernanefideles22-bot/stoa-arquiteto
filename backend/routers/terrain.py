@@ -205,7 +205,17 @@ def get_elevation(project_id: int, db: Session = Depends(get_db)):
     try:
         topo = db.query(Topography).filter(Topography.project_id == project_id).first()
         terrain = db.query(Terrain).filter(Terrain.project_id == project_id).first()
-        imp = db.query(Implantation).filter(Implantation.project_id == project_id).first()
+        # Usa a implantacao SELECIONADA (unica que tem imp.lotes preenchido por
+        # /api/implantation/select). .first() sem esse filtro pegava uma alternativa
+        # arbitraria (geralmente a primeira gerada), que nao tem lotes posicionados --
+        # o visualizador 3D mostrava numero de lotes errado ou nenhum lote.
+        imp = db.query(Implantation).filter(
+            Implantation.project_id == project_id, Implantation.is_selected == True
+        ).first()
+        if imp is None:
+            imp = db.query(Implantation).filter(
+                Implantation.project_id == project_id
+            ).order_by(Implantation.score_total.desc()).first()
 
         elevation_grid = None
         if topo and topo.elevation_grid:

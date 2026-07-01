@@ -27,9 +27,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# CORS_ORIGINS: lista separada por virgula (ex: "https://stoacivil.com.br,https://app.stoacivil.com.br").
+# Sem essa variavel definida, mantem o comportamento atual (libera geral) para nao quebrar
+# nada em producao sem dominio fixo ainda -- mas o ideal e restringir assim que houver um
+# dominio definitivo, em vez de manter allow_origins=["*"] indefinidamente.
+_cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
+_cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()] if _cors_origins_env else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -42,7 +49,11 @@ app.include_router(financial.router)
 app.include_router(report.router)
 
 # Servir frontend
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+# Fonte unica de verdade: public/ (mesmo arquivo servido em producao pela Vercel,
+# conforme vercel.json). Ate 2026-07 existia um segundo frontend em frontend/index.html
+# (Leaflet/MapLibre) que tinha ficado para tras da versao com Cesium 3D publicada em
+# producao -- foi removido para eliminar a divergencia entre ambiente local e producao.
+FRONTEND_DIR = Path(__file__).parent.parent / "public"
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
