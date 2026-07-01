@@ -19,6 +19,17 @@
       "dest": "api/index.py"
     },
     {
+      "src": "/health",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/(index\\.html)?",
+      "dest": "public/index.html",
+      "headers": {
+        "cache-control": "public, max-age=0, must-revalidate"
+      }
+    },
+    {
       "src": "/(.*)",
       "dest": "public/$1"
     }
