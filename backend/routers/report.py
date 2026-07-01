@@ -42,19 +42,16 @@ async def generate_report(data: ReportRequest, db: Session = Depends(get_db)):
                 "num_lotes": imp.num_lotes,
                 "area_media_lote": imp.area_media_lote,
             }
-        fin_ia = {}
+        # Numeros vem das colunas dedicadas do Financial (ja populadas corretamente
+        # em backend/routers/financial.py), nao de um round-trip via analise_ia --
+        # esse campo texto guarda so recomendacoes/alertas qualitativos da IA.
         if fin:
-            if fin.analise_ia:
-                try:
-                    fin_ia = json.loads(fin.analise_ia) if isinstance(fin.analise_ia, str) else fin.analise_ia
-                except Exception:
-                    fin_ia = {}
             project_data["financeiro"] = {
-                "vgv":           fin_ia.get("receitas", {}).get("vgv_total", 0),
-                "lucro_bruto":   fin_ia.get("resultado", {}).get("lucro_bruto", 0),
-                "margem_bruta":  fin_ia.get("resultado", {}).get("margem_bruta_percent", 0),
-                "roi":           fin_ia.get("resultado", {}).get("roi_percent", 0),
-                "payback_meses": fin_ia.get("resultado", {}).get("payback_meses", 0),
+                "vgv":           fin.vgv or 0,
+                "lucro_bruto":   fin.lucro_bruto or 0,
+                "margem_bruta":  fin.margem_bruta or 0,
+                "roi":           fin.roi or 0,
+                "payback_meses": fin.payback_meses or 0,
             }
 
         resumo = ""
@@ -306,13 +303,9 @@ def _build_pdf(project, terrain, topo, imp, fin, resumo: str, project_data: dict
         for r in kpi_rows:
             table_row(list(r), widths=[80, 50, 50])
 
-        fin_full = {}
-        if fin.analise_ia:
-            try:
-                fin_full = json.loads(fin.analise_ia) if isinstance(fin.analise_ia, str) else fin.analise_ia
-            except Exception:
-                pass
-        cenarios = fin_full.get("cenarios", {})
+        # fin.cenarios ja e um dict real (coluna JSON populada direto em financial.py) --
+        # nao precisa (e nao deve) ser extraido de analise_ia.
+        cenarios = fin.cenarios or {}
         if cenarios:
             pdf.ln(4)
             pdf.set_font("Helvetica", "B", 10)
@@ -324,7 +317,17 @@ def _build_pdf(project, terrain, topo, imp, fin, resumo: str, project_data: dict
                 c = cenarios.get(c_name, {})
                 table_row([c_name.capitalize(), _fmt_brl(c.get("vgv")), f"{c.get('margem', '-')}%"], widths=[60, 60, 60])
 
-        recs = fin_full.get("recomendacoes_financeiras", [])
+        # analise_ia guarda {"recomendacoes_financeiras": [...], "alertas": [...]} como
+        # JSON valido (ver backend/routers/financial.py). Antes era str(lista python),
+        # o que quebrava o json.loads e zerava essa secao inteira -- corrigido.
+        fin_ia = {}
+        if fin.analise_ia:
+            try:
+                fin_ia = json.loads(fin.analise_ia) if isinstance(fin.analise_ia, str) else fin.analise_ia
+            except Exception:
+                fin_ia = {}
+
+        recs = fin_ia.get("recomendacoes_financeiras", [])
         if recs:
             pdf.ln(6)
             pdf.set_font("Helvetica", "B", 9)
@@ -337,6 +340,20 @@ def _build_pdf(project, terrain, topo, imp, fin, resumo: str, project_data: dict
                 pdf.set_x(15)
                 pdf.cell(5, 6, "->")
                 pdf.multi_cell(175, 6, _safe(str(r)))
+
+        alertas = fin_ia.get("alertas", [])
+        if alertas:
+            pdf.ln(4)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(200, 80, 40)
+            pdf.set_x(15)
+            pdf.cell(0, 6, "Alertas:", ln=True)
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(40, 40, 60)
+            for a in alertas[:5]:
+                pdf.set_x(15)
+                pdf.cell(5, 6, "!")
+                pdf.multi_cell(175, 6, _safe(str(a)))
         pdf.ln(4)
 
     pdf.ln(10)
