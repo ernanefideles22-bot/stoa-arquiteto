@@ -1,0 +1,139 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<script src="https://unpkg.com/cesium@1.118.0/Build/Cesium/Cesium.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/cesium@1.118.0/Build/Cesium/Widgets/widgets.css">
+<style>body{margin:0;background:#0b0e1a;color:#fff;font-family:sans-serif}
+#map{height:600px;position:relative;overflow:hidden} .map-ui { position:absolute; z-index:10; }
+.map-chips { top:10px; left:10px; display:flex; gap:6px; flex-wrap:wrap; }
+.map-chip { background:rgba(10,14,26,.82); border:1px solid rgba(255,255,255,.15); border-radius:20px;
+  padding:4px 12px; font-size:12px; cursor:pointer; backdrop-filter:blur(4px); user-select:none; }
+.map-chip:hover { border-color:var(--primary,#4da3ff); }
+.map-chip.active { background:var(--primary,#4da3ff); color:#08101e; font-weight:600; border-color:transparent; }
+.map-tools { top:10px; right:10px; display:flex; flex-direction:column; gap:6px; }
+.map-btn { width:34px; height:34px; border-radius:8px; border:1px solid rgba(255,255,255,.15);
+  background:rgba(10,14,26,.82); color:#fff; font-size:16px; cursor:pointer; backdrop-filter:blur(4px); }
+.map-btn:hover { border-color:var(--primary,#4da3ff); }
+#mapCoords { bottom:10px; left:10px; background:rgba(10,14,26,.82); border-radius:6px;
+  padding:3px 10px; font-size:11px; font-family:monospace; color:#cfe3ff; pointer-events:none; }
+</style></head><body>
+<input type="hidden" id="terrainLat"><input type="hidden" id="terrainLon">
+<div id="map">
+<div class="map-ui map-chips">
+<span class="map-chip active" data-layer="hibrido" onclick="mapSetLayer('hibrido')">Híbrido</span>
+<span class="map-chip" data-layer="satelite" onclick="mapSetLayer('satelite')">Satélite</span>
+<span class="map-chip" data-layer="ruas" onclick="mapSetLayer('ruas')">Ruas</span>
+<span class="map-chip" data-layer="topo" onclick="mapSetLayer('topo')">Topográfico</span>
+</div>
+<div class="map-ui map-tools">
+<button class="map-btn" onclick="mapZoom(0.5)">+</button>
+<button class="map-btn" onclick="mapZoom(2)">−</button>
+<button class="map-btn" onclick="mapHomeBrasil()">🏠</button>
+</div>
+<div class="map-ui" id="mapCoords">—</div>
+</div>
+<script>let map=null; function _placeMapMarker(){}
+const _MAP_SOURCES = {
+  satelite: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    credit: '© Esri, Maxar, Earthstar Geographics', maximumLevel: 19 }),
+  labels: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    credit: '© Esri', maximumLevel: 19 }),
+  ruas: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    credit: '© OpenStreetMap contributors', maximumLevel: 19 }),
+  topo: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+    credit: '© OpenTopoMap (CC-BY-SA) / OSM', maximumLevel: 17 }),
+};
+
+function mapSetLayer(mode) {
+  if (!map) return;
+  map.imageryLayers.removeAll();
+  if (mode === 'hibrido') {
+    map.imageryLayers.addImageryProvider(_MAP_SOURCES.satelite());
+    map.imageryLayers.addImageryProvider(_MAP_SOURCES.labels());
+  } else {
+    map.imageryLayers.addImageryProvider(_MAP_SOURCES[mode]());
+  }
+  document.querySelectorAll('.map-chip').forEach(el =>
+    el.classList.toggle('active', el.dataset.layer === mode));
+}
+
+function mapZoom(fator) {
+  if (!map) return;
+  const h = map.camera.positionCartographic.height;
+  if (fator < 1) map.camera.zoomIn(h * 0.5); else map.camera.zoomOut(h);
+}
+
+function mapHomeBrasil() {
+  if (!map) return;
+  map.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(-52.0, -14.0, 5500000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
+    duration: 1.2,
+  });
+}
+
+function mapIrAoTerreno() {
+  const lat = parseFloat(document.getElementById('terrainLat').value);
+  const lon = parseFloat(document.getElementById('terrainLon').value);
+  if (isNaN(lat) || isNaN(lon)) { alert('Preencha latitude/longitude (ou clique no mapa) primeiro'); return; }
+  map.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(lon, lat, 2500),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 },
+    duration: 1.6,
+  });
+}
+
+function initMap() {
+  map = new Cesium.Viewer('map', {
+    baseLayerPicker: false,
+    geocoder: false,
+    homeButton: false,
+    sceneModePicker: false,
+    navigationHelpButton: false,
+    animation: false,
+    timeline: false,
+    fullscreenButton: false,
+    infoBox: false,
+    selectionIndicator: false,
+    baseLayer: new Cesium.ImageryLayer(_MAP_SOURCES.satelite()),
+    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+  });
+  map.imageryLayers.addImageryProvider(_MAP_SOURCES.labels());  // hibrido por padrao
+  map.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0d1b2a');
+  map.scene.screenSpaceCameraController.minimumZoomDistance = 120;
+
+  try { map.cesiumWidget.creditContainer.style.display = 'none'; } catch(e) {}
+
+  // Posicao inicial — Brasil visto de cima
+  map.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(-52.0, -14.0, 5500000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
+  });
+
+  const handler = new Cesium.ScreenSpaceEventHandler(map.scene.canvas);
+
+  // Clique define as coordenadas do formulario
+  handler.setInputAction(function(click) {
+    const cartesian = map.camera.pickEllipsoid(click.position, map.scene.globe.ellipsoid);
+    if (!cartesian) return;
+    const carto = Cesium.Cartographic.fromCartesian(cartesian);
+    const lat = Cesium.Math.toDegrees(carto.latitude);
+    const lng = Cesium.Math.toDegrees(carto.longitude);
+    document.getElementById('terrainLat').value = lat.toFixed(6);
+    document.getElementById('terrainLon').value = lng.toFixed(6);
+    _placeMapMarker(lat, lng, null, null);
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  // Coordenadas sob o cursor (estilo Avenza)
+  const coordEl = document.getElementById('mapCoords');
+  handler.setInputAction(function(move) {
+    const cartesian = map.camera.pickEllipsoid(move.endPosition, map.scene.globe.ellipsoid);
+    if (!cartesian || !coordEl) return;
+    const carto = Cesium.Cartographic.fromCartesian(cartesian);
+    coordEl.textContent = Cesium.Math.toDegrees(carto.latitude).toFixed(5) + ', ' +
+                          Cesium.Math.toDegrees(carto.longitude).toFixed(5);
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+}
+initMap();</script></body></html>
