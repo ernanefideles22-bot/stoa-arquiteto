@@ -6,7 +6,9 @@ from datetime import datetime
 import traceback
 import os
 
-from ..models.database import get_db, Project, engine
+from ..models.database import (get_db, engine, Project, Terrain, Topography,
+                               Implantation, Architecture, Urbanism, Financial, Report)
+from ..services.errors import error_detail
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -54,7 +56,7 @@ def list_projects(db: Session = Depends(get_db)):
         projects = db.query(Project).order_by(Project.updated_at.desc()).all()
         return [_serialize(p) for p in projects]
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": str(e), "traceback": traceback.format_exc()[-500:]})
+        raise HTTPException(status_code=500, detail=error_detail(e, "projects"))
 
 
 @router.post("")
@@ -66,7 +68,7 @@ def create_project(data: ProjectCreate, db: Session = Depends(get_db)):
         db.refresh(p)
         return _serialize(p)
     except Exception as e:
-        raise HTTPException(status_code=500, detail={"error": str(e), "traceback": traceback.format_exc()[-500:]})
+        raise HTTPException(status_code=500, detail=error_detail(e, "projects"))
 
 
 @router.get("/{project_id}")
@@ -95,8 +97,19 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     p = db.query(Project).filter(Project.id == project_id).first()
     if not p:
         raise HTTPException(404, "Projeto nao encontrado")
-    db.delete(p)
-    db.commit()
+    try:
+        # As FKs no banco de producao nao tem ON DELETE CASCADE, entao deletar
+        # o projeto direto estoura IntegrityError (e o 500 que impedia qualquer
+        # exclusao de projeto com dados). Remove os filhos explicitamente antes.
+        for model in (Report, Financial, Architecture, Urbanism, Implantation,
+                      Topography, Terrain):
+            db.query(model).filter(model.project_id == project_id).delete(
+                synchronize_session=False)
+        db.delete(p)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=error_detail(e, "delete_project"))
     return {"ok": True}
 
 

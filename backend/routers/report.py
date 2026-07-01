@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import base64, json, traceback, datetime
 from ..models.database import get_db, Project, Terrain, Topography, Implantation, Financial
 from ..services import ai_engine
+from ..services.errors import error_detail, debug_or_none
 
 router = APIRouter(prefix="/api/report", tags=["report"])
 
@@ -60,7 +61,9 @@ async def generate_report(data: ReportRequest, db: Session = Depends(get_db)):
             resumo = await ai_engine.gerar_resumo_executivo(project_data)
         except Exception as e:
             resumo_error = str(e)
-            resumo = f"Resumo nao disponivel: {resumo_error}"
+            # Mensagem generica pro usuario; o erro real vai pro log e, em modo
+            # debug, pro campo debug_resumo_error.
+            resumo = "Resumo executivo indisponivel no momento (falha ao consultar a IA)."
 
         pdf_b64  = None
         pdf_error = None
@@ -76,13 +79,14 @@ async def generate_report(data: ReportRequest, db: Session = Depends(get_db)):
             "has_topo": topo is not None,
             "has_implantacao": imp is not None,
             "has_financeiro": fin is not None,
-            "debug_resumo_error": resumo_error,
-            "debug_pdf_error": pdf_error,
+            # Campos de debug so em modo debug -- traceback nao vaza em producao
+            "debug_resumo_error": debug_or_none(resumo_error),
+            "debug_pdf_error": debug_or_none(pdf_error),
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro interno: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=error_detail(e, "report_generate"))
 
 
 # ── PDF BUILDER ──────────────────────────────────────────────────────────

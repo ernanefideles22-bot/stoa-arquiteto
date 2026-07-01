@@ -243,4 +243,5 @@ def get_elevation(project_id: int, db: Session = Depends(get_db)):
             "area_media_lote": imp.area_media_lote if imp else 0,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=_tb.format_exc())
+        from ..services.errors import error_detail
+        raise HTTPException(status_code=500, detail=error_detail(e, "terrain_elevation"))
