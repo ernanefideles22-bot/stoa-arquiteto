@@ -11,7 +11,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 # Criar .env
 if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
-    Write-Host "📝 Arquivo .env criado. Configure sua OPENAI_API_KEY." -ForegroundColor Yellow
+    Write-Host "📝 Arquivo .env criado. Configure sua ANTHROPIC_API_KEY." -ForegroundColor Yellow
 }
 
 # Criar venv
@@ -28,6 +28,6 @@ Write-Host ""
 Write-Host "✅ Instalação concluída!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Próximo passo:" -ForegroundColor White
-Write-Host "  1. Edite o arquivo .env e adicione sua OPENAI_API_KEY" -ForegroundColor Gray
+Write-Host "  1. Edite o arquivo .env e adicione sua ANTHROPIC_API_KEY" -ForegroundColor Gray
 Write-Host "  2. Execute: .\run.ps1" -ForegroundColor Gray
 Write-Host ""
