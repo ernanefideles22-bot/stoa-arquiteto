@@ -460,7 +460,7 @@ textarea{resize:vertical;min-height:72px;}
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
       <button class="btn btn-outline" onclick="closeNewProjectModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="createProject()">Criar Projeto</button>
+      <button class="btn btn-primary" id="btnCreateProject" onclick="createProject()">Criar Projeto</button>
     </div>
   </div>
 </div>
@@ -604,20 +604,34 @@ function closeNewProjectModal() {
 async function createProject() {
   const name = document.getElementById('newProjectName').value.trim();
   if (!name) { alert('Informe o nome do projeto'); return; }
-  const res = await fetch(`${API}/api/projects`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      name,
-      client: document.getElementById('newProjectClient').value,
-      typology: document.getElementById('newProjectTypology').value,
-      description: document.getElementById('newProjectDesc').value,
-    })
-  });
-  const p = await res.json();
-  closeNewProjectModal();
-  await loadProjects();
-  await selectProject(p.id);
+  // Trava contra duplo clique: sem isso, cada clique extra criava um projeto
+  // duplicado no banco (nao havia disable nem guard neste handler).
+  const btn = document.getElementById('btnCreateProject');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Criando...';
+  try {
+    const res = await fetch(`${API}/api/projects`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name,
+        client: document.getElementById('newProjectClient').value,
+        typology: document.getElementById('newProjectTypology').value,
+        description: document.getElementById('newProjectDesc').value,
+      })
+    });
+    const p = await res.json();
+    if (!res.ok) throw new Error(p.detail?.error || p.detail || 'Falha ao criar projeto');
+    closeNewProjectModal();
+    await loadProjects();
+    await selectProject(p.id);
+  } catch(e) {
+    alert('Erro ao criar projeto: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Criar Projeto';
+  }
 }
 
 // ── TABS ─────────────────────────────────────────────────────────────────
@@ -967,7 +981,7 @@ function renderImplantationResults(data) {
               ${(alt.vantagens||[]).map(v=>`<div style="font-size:11px;color:var(--success)">✓ ${v}</div>`).join('')}
               ${(alt.desvantagens||[]).map(v=>`<div style="font-size:11px;color:var(--warn)">⚠ ${v}</div>`).join('')}
             </div>
-            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="selectAlt(${alt.id})">
+            <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="event.stopPropagation(); selectAlt(${alt.id})">
               Selecionar esta opção
             </button>
           </div>
@@ -977,19 +991,31 @@ function renderImplantationResults(data) {
   `;
 }
 
+let _selectAltBusy = false;
 async function selectAlt(id) {
   if (!currentProject) return;
-  await fetch(`${API}/api/implantation/select`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({project_id: currentProject.id, implantation_id: id})
-  });
-  document.querySelectorAll('.alt-card').forEach(c => c.classList.remove('selected'));
-  const el = document.getElementById(`alt-${id}`);
-  if (el) el.classList.add('selected');
-  await loadProjects();
-  const r = await fetch(`${API}/api/projects/${currentProject.id}`);
-  currentProject = await r.json();
-  renderOverview();
+  // O clique no botao "Selecionar esta opcao" borbulhava para o onclick do
+  // card (mesma funcao), disparando o POST duas vezes. Alem do
+  // stopPropagation no botao, este guard bloqueia qualquer reentrada.
+  if (_selectAltBusy) return;
+  _selectAltBusy = true;
+  try {
+    await fetch(`${API}/api/implantation/select`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({project_id: currentProject.id, implantation_id: id})
+    });
+    document.querySelectorAll('.alt-card').forEach(c => c.classList.remove('selected'));
+    const el = document.getElementById(`alt-${id}`);
+    if (el) el.classList.add('selected');
+    await loadProjects();
+    const r = await fetch(`${API}/api/projects/${currentProject.id}`);
+    currentProject = await r.json();
+    renderOverview();
+  } catch(e) {
+    alert('Erro ao selecionar implantação: ' + e.message);
+  } finally {
+    _selectAltBusy = false;
+  }
 }
 
 // ── FINANCEIRO ───────────────────────────────────────────────────────────

@@ -67,10 +67,13 @@ class Project(Base):
     financial = relationship("Financial", back_populates="project", uselist=False)
     reports = relationship("Report", back_populates="project")
 
+# NOTA: ondelete="CASCADE" vale para bancos criados do zero via create_tables().
+# O banco de producao existente foi criado sem cascade; por isso o endpoint
+# DELETE /api/projects/{id} tambem remove os filhos explicitamente.
 class Terrain(Base):
     __tablename__ = "terrains"
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     address = Column(String)
     city = Column(String)
     state = Column(String)
@@ -92,7 +95,7 @@ class Terrain(Base):
 class Topography(Base):
     __tablename__ = "topographies"
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     elevation_grid = Column(JSON)
     alt_min = Column(Float)
     alt_max = Column(Float)
@@ -117,7 +120,7 @@ class Topography(Base):
 class Implantation(Base):
     __tablename__ = "implantations"
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     nome = Column(String)
     descricao = Column(Text)
     score_tecnico = Column(Float)
@@ -145,7 +148,7 @@ class Implantation(Base):
 class Architecture(Base):
     __tablename__ = "architectures"
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     estilo = Column(String)
     area_unidade = Column(Float)
     pavimentos = Column(Integer)
@@ -160,7 +163,7 @@ class Architecture(Base):
 class Urbanism(Base):
     __tablename__ = "urbanisms"
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     taxa_ocupacao = Column(Float)
     coef_aproveitamento = Column(Float)
     area_permeavel = Column(Float)
@@ -177,7 +180,7 @@ class Urbanism(Base):
 class Financial(Base):
     __tablename__ = "financials"
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     custo_terreno = Column(Float)
     custo_infraestrutura = Column(Float)
     custo_construcao = Column(Float)
@@ -205,7 +208,7 @@ class Financial(Base):
 class Report(Base):
     __tablename__ = "reports"
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     tipo = Column(String)
     titulo = Column(String)
     filename = Column(String)
