@@ -144,9 +144,49 @@ textarea{resize:vertical;min-height:72px;}
 /* ── EMPTY STATE ── */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text2);text-align:center;gap:12px;}
 .empty-icon{font-size:48px;opacity:.4;}
+
+/* -- Auth -- */
+#authOverlay { position:fixed; inset:0; background:var(--bg,#0b0e1a); z-index:1000;
+  display:flex; align-items:center; justify-content:center; }
+#authOverlay.hidden { display:none; }
+.auth-box { width:min(380px,90vw); background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
+  border-radius:14px; padding:32px; }
+.auth-box h2 { margin-bottom:6px; }
+.auth-box p { font-size:13px; color:var(--text2,#8b93b0); margin-bottom:18px; }
+.auth-box input { width:100%; margin-bottom:12px; padding:10px 12px; border-radius:8px;
+  border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.25); color:inherit; font-size:14px; }
+.auth-box .btn { width:100%; margin-bottom:8px; }
+.auth-error { color:#ff7a7a; font-size:13px; min-height:18px; margin-bottom:8px; }
+/* -- Lens -- */
+.lens-modes { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+.lens-mode { border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:12px; cursor:pointer;
+  text-align:center; font-size:13px; transition:.15s; }
+.lens-mode:hover { border-color:var(--primary,#4da3ff); }
+.lens-mode.active { border-color:var(--primary,#4da3ff); background:rgba(77,163,255,.08); }
+.lens-mode .lm-icon { font-size:22px; display:block; margin-bottom:6px; }
+#lensDrop { border:2px dashed rgba(255,255,255,.15); border-radius:12px; padding:28px; text-align:center;
+  color:var(--text2,#8b93b0); cursor:pointer; margin-bottom:14px; }
+#lensDrop.drag { border-color:var(--primary,#4da3ff); }
+#lensPreview { max-width:100%; max-height:260px; border-radius:10px; display:none; margin:0 auto 12px; }
+.lens-result-item { padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:13px; }
+.lens-result-item strong { color:var(--text2,#8b93b0); font-weight:600; display:block; font-size:11px;
+  text-transform:uppercase; letter-spacing:.4px; }
 </style>
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<div id="authOverlay" class="hidden">
+  <div class="auth-box">
+    <h2>🏗️ STOA Civil</h2>
+    <p>Acesso restrito. Entre com seu email e senha.</p>
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+    <input type="password" id="authPass" placeholder="Senha" autocomplete="current-password">
+    <div class="auth-error" id="authError"></div>
+    <button class="btn btn-primary" id="btnLogin" onclick="authLogin()">Entrar</button>
+    <button class="btn" id="btnSignup" onclick="authSignup()">Criar conta</button>
+  </div>
+</div>
+
 
 <!-- HEADER -->
 <header>
@@ -157,6 +197,7 @@ textarea{resize:vertical;min-height:72px;}
   <div class="header-actions">
     <span id="projectTitle" style="color:var(--text2);font-size:13px;">Nenhum projeto selecionado</span>
     <button class="btn btn-primary" onclick="openNewProjectModal()">+ Novo Projeto</button>
+    <button class="btn" onclick="authLogout()" title="Sair" style="margin-left:8px">Sair</button>
   </div>
 </header>
 
@@ -184,6 +225,7 @@ textarea{resize:vertical;min-height:72px;}
       <div class="tab" data-tab="implantation" onclick="showTab('implantation')">🗺️ Implantação</div>
       <div class="tab" data-tab="financial" onclick="showTab('financial')">💰 Viabilidade</div>
       <div class="tab" data-tab="viewer3d" onclick="showTab('viewer3d');init3D()">🎯 3D</div>
+      <div class="tab" data-tab="lens" onclick="showTab('lens')">📷 Lens</div>
       <div class="tab" data-tab="report" onclick="showTab('report')">📄 Relatório</div>
     </nav>
 
@@ -414,6 +456,31 @@ textarea{resize:vertical;min-height:72px;}
       </div>
 
       <!-- RELATORIO -->
+      <!-- LENS -->
+      <div class="panel" id="panel-lens">
+        <div class="card">
+          <div class="card-title"><span>📷</span> STOA Lens — Análise de Imagem por IA</div>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:14px">
+            Envie uma foto e a IA extrai as informações. Nada é gravado sem sua revisão.
+          </p>
+          <div class="lens-modes">
+            <div class="lens-mode active" data-mode="terreno" onclick="lensSetMode('terreno')"><span class="lm-icon">🌄</span>Foto do terreno</div>
+            <div class="lens-mode" data-mode="documento" onclick="lensSetMode('documento')"><span class="lm-icon">📑</span>Documento do imóvel</div>
+            <div class="lens-mode" data-mode="planta" onclick="lensSetMode('planta')"><span class="lm-icon">📐</span>Planta / croqui</div>
+            <div class="lens-mode" data-mode="mapa" onclick="lensSetMode('mapa')"><span class="lm-icon">🗺️</span>Print de mapa</div>
+          </div>
+          <div id="lensDrop" onclick="document.getElementById('lensFile').click()">
+            Arraste uma imagem aqui, cole (Ctrl+V) ou clique para escolher<br>
+            <small>JPEG/PNG/WebP — comprimida automaticamente antes do envio</small>
+          </div>
+          <input type="file" id="lensFile" accept="image/*" style="display:none" onchange="lensPickFile(this.files[0])">
+          <img id="lensPreview" alt="preview">
+          <textarea id="lensContext" placeholder="Contexto opcional (ex: terreno em Nova Lima/MG, 5 ha, pretendo loteamento)" style="width:100%;min-height:52px;margin-bottom:12px"></textarea>
+          <button class="btn btn-primary" id="btnLens" onclick="lensAnalyze()" disabled>🔍 Analisar com IA</button>
+        </div>
+        <div id="lensResults"></div>
+      </div>
+
       <div class="panel" id="panel-report">
         <div class="card">
           <div class="card-title"><span>📄</span> Relatório Executivo</div>
@@ -475,8 +542,8 @@ let scene3D, camera3D, renderer3D, animId;
 // ── INIT ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  initMap();
-  loadProjects();
+  // O app so carrega dados depois do login (initAuth -> startApp).
+  initAuth();
 });
 
 function initMap() {
@@ -1323,6 +1390,214 @@ function animate3D() {
   animId = requestAnimationFrame(animate3D);
   if (renderer3D && scene3D && camera3D) renderer3D.render(scene3D, camera3D);
 }
+
+// ═══ AUTH (Supabase) ══════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://ankrlomafgitalnbfhlk.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_K9p8I8EJxeJDqToho99UPg_dBDykdJI';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+let _accessToken = null;
+let _appStarted = false;
+
+// Toda chamada same-origin a /api/* sai com o Bearer token. 401 => tela de login.
+const _origFetch = window.fetch.bind(window);
+window.fetch = async (url, opts = {}) => {
+  const u = typeof url === 'string' ? url : url.url;
+  const isApi = u.startsWith('/api') || u.startsWith(`${location.origin}/api`);
+  if (isApi && _accessToken) {
+    opts.headers = Object.assign({}, opts.headers, { 'Authorization': `Bearer ${_accessToken}` });
+  }
+  const res = await _origFetch(url, opts);
+  if (isApi && res.status === 401) showAuth('Sessão expirada — entre novamente.');
+  return res;
+};
+
+function showAuth(msg) {
+  document.getElementById('authOverlay').classList.remove('hidden');
+  if (msg) document.getElementById('authError').textContent = msg;
+}
+function hideAuth() { document.getElementById('authOverlay').classList.add('hidden'); }
+
+async function authLogin() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { errEl.textContent = error.message; return; }
+  _accessToken = data.session.access_token;
+  hideAuth(); startApp();
+}
+
+async function authSignup() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  if (pass.length < 6) { errEl.textContent = 'Senha precisa de 6+ caracteres'; return; }
+  const { data, error } = await sb.auth.signUp({ email, password: pass });
+  if (error) { errEl.textContent = error.message; return; }
+  if (data.session) { _accessToken = data.session.access_token; hideAuth(); startApp(); }
+  else errEl.textContent = 'Conta criada — confirme pelo link enviado ao seu email e entre.';
+}
+
+async function authLogout() {
+  await sb.auth.signOut();
+  _accessToken = null;
+  location.reload();
+}
+
+async function initAuth() {
+  const { data } = await sb.auth.getSession();
+  if (data.session) { _accessToken = data.session.access_token; hideAuth(); startApp(); }
+  else showAuth('');
+  sb.auth.onAuthStateChange((_e, session) => { _accessToken = session ? session.access_token : null; });
+}
+
+function startApp() {
+  if (_appStarted) return;
+  _appStarted = true;
+  initMap();
+  loadProjects();
+}
+
+// ═══ STOA LENS ════════════════════════════════════════════════════════════
+let _lensMode = 'terreno';
+let _lensImage = null;   // {b64, mediaType}
+
+function lensSetMode(m) {
+  _lensMode = m;
+  document.querySelectorAll('.lens-mode').forEach(el =>
+    el.classList.toggle('active', el.dataset.mode === m));
+}
+
+// Redimensiona no cliente: Claude trabalha melhor ate ~1568px e o body da
+// Vercel estoura em 4,5MB — JPEG q0.85 em ate 1568px resolve os dois.
+async function _lensCompress(file) {
+  const bmp = await createImageBitmap(file);
+  const MAX = 1568;
+  const scale = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * scale);
+  canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  return { b64: dataUrl.split(',')[1], mediaType: 'image/jpeg', dataUrl };
+}
+
+async function lensPickFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  try {
+    const img = await _lensCompress(file);
+    _lensImage = img;
+    const prev = document.getElementById('lensPreview');
+    prev.src = img.dataUrl; prev.style.display = 'block';
+    document.getElementById('btnLens').disabled = false;
+  } catch (e) { alert('Não consegui ler essa imagem: ' + e.message); }
+}
+
+document.addEventListener('paste', e => {
+  const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+  if (item && document.getElementById('panel-lens').classList.contains('active'))
+    lensPickFile(item.getAsFile());
+});
+
+(() => {
+  const drop = document.getElementById('lensDrop');
+  ['dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault();
+    drop.classList.toggle('drag', ev === 'dragover');
+    if (ev === 'drop') lensPickFile(e.dataTransfer.files[0]);
+  }));
+})();
+
+async function lensAnalyze() {
+  if (!_lensImage) return;
+  const btn = document.getElementById('btnLens');
+  if (btn.disabled && btn.textContent.includes('Analisando')) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Analisando (~20s)...';
+  try {
+    const res = await fetch(`${API}/api/lens/analyze`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        mode: _lensMode,
+        image_base64: _lensImage.b64,
+        media_type: _lensImage.mediaType,
+        contexto: document.getElementById('lensContext').value,
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail?.error || data.detail || 'Falha na análise');
+    lensRender(data.mode, data.resultado);
+  } catch (e) { alert('Erro na análise: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+const _LENS_LABELS = {
+  descricao:'Descrição', vegetacao:'Vegetação', topografia_aparente:'Topografia aparente',
+  acesso:'Acesso', construcoes_vizinhas:'Entorno', riscos_visiveis:'Riscos visíveis',
+  potencial:'Potencial', limitacoes:'Limitações', tipo_documento:'Tipo de documento',
+  endereco:'Endereço', cidade:'Cidade', estado:'UF', area_m2:'Área (m²)',
+  matricula_numero:'Matrícula', cartorio:'Cartório', proprietario:'Proprietário',
+  confrontacoes:'Confrontações', onus_gravames:'Ônus/gravames', texto_relevante:'Trechos-chave',
+  tipo:'Tipo', pavimentos_visiveis:'Pavimentos', ambientes:'Ambientes',
+  area_total_estimada_m2:'Área total estimada (m²)', escala_visivel:'Escala',
+  observacoes_tecnicas:'Observações técnicas', inconsistencias:'Inconsistências',
+  local_identificado:'Local identificado', coordenadas_visiveis:'Coordenadas visíveis',
+  terreno_demarcado:'Terreno demarcado', entorno:'Entorno',
+  caracteristicas_relevantes:'Características relevantes',
+};
+
+function _lensFmt(v) {
+  if (v == null || v === '') return '—';
+  if (Array.isArray(v)) {
+    if (!v.length) return '—';
+    if (typeof v[0] === 'object')
+      return v.map(o => `${o.nome || '?'} ${o.dimensoes ? '('+o.dimensoes+')' : ''} ${o.area_m2 ? '— '+o.area_m2+' m²' : ''}`).join('<br>');
+    return v.map(x => '• ' + escapeHtml(String(x))).join('<br>');
+  }
+  if (typeof v === 'object') return escapeHtml(JSON.stringify(v));
+  if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+  return escapeHtml(String(v));
+}
+
+function lensRender(mode, r) {
+  const rows = Object.entries(r)
+    .filter(([k]) => k !== 'campos_cadastro')
+    .map(([k, v]) => `<div class="lens-result-item"><strong>${_LENS_LABELS[k] || k}</strong>${_lensFmt(v)}</div>`)
+    .join('');
+  const temCampos = r.campos_cadastro && Object.values(r.campos_cadastro).some(v => v != null && v !== '');
+  document.getElementById('lensResults').innerHTML = `
+    <div class="card">
+      <div class="card-title"><span>🔍</span> Resultado da análise</div>
+      ${rows}
+      ${temCampos ? `<button class="btn btn-primary" style="margin-top:14px" onclick="lensApply()">✏️ Aplicar ao cadastro do terreno</button>
+      <p style="font-size:12px;color:var(--text2);margin-top:6px">Preenche o formulário do Terreno — revise e salve você mesmo.</p>` : ''}
+    </div>`;
+  window._lensLast = { mode, resultado: r };
+}
+
+function lensApply() {
+  const r = window._lensLast?.resultado;
+  const c = r?.campos_cadastro;
+  if (!c) return;
+  if (!currentProject) { alert('Selecione ou crie um projeto primeiro'); return; }
+  const setVal = (id, v) => { if (v != null && v !== '') { const el = document.getElementById(id); if (el) el.value = v; } };
+  setVal('terrainAddress', c.address);
+  setVal('terrainCity', c.city);
+  setVal('terrainState', c.state);
+  setVal('terrainArea', c.area_ha);
+  setVal('terrainLat', c.lat);
+  setVal('terrainLon', c.lon);
+  setVal('terrainVeg', c.vegetation);
+  setVal('terrainTopo', c.topography_general);
+  setVal('terrainAcesso', c.access);
+  const notes = document.getElementById('terrainNotes');
+  if (c.zoning_notes) notes.value = (notes.value ? notes.value + '\n' : '') + '[Lens] ' + c.zoning_notes;
+  showTab('terrain');
+}
+
 </script>
 </body>
 </html>
