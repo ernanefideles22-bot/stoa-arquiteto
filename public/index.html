@@ -171,6 +171,19 @@ textarea{resize:vertical;min-height:72px;}
 .lens-result-item { padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:13px; }
 .lens-result-item strong { color:var(--text2,#8b93b0); font-weight:600; display:block; font-size:11px;
   text-transform:uppercase; letter-spacing:.4px; }
+
+.map-ui { position:absolute; z-index:10; }
+.map-chips { top:10px; left:10px; display:flex; gap:6px; flex-wrap:wrap; }
+.map-chip { background:rgba(10,14,26,.82); border:1px solid rgba(255,255,255,.15); border-radius:20px;
+  padding:4px 12px; font-size:12px; cursor:pointer; backdrop-filter:blur(4px); user-select:none; }
+.map-chip:hover { border-color:var(--primary,#4da3ff); }
+.map-chip.active { background:var(--primary,#4da3ff); color:#08101e; font-weight:600; border-color:transparent; }
+.map-tools { top:10px; right:10px; display:flex; flex-direction:column; gap:6px; }
+.map-btn { width:34px; height:34px; border-radius:8px; border:1px solid rgba(255,255,255,.15);
+  background:rgba(10,14,26,.82); color:#fff; font-size:16px; cursor:pointer; backdrop-filter:blur(4px); }
+.map-btn:hover { border-color:var(--primary,#4da3ff); }
+#mapCoords { bottom:10px; left:10px; background:rgba(10,14,26,.82); border-radius:6px;
+  padding:3px 10px; font-size:11px; font-family:monospace; color:#cfe3ff; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -339,7 +352,21 @@ textarea{resize:vertical;min-height:72px;}
         <!-- Mapa -->
         <div class="card">
           <div class="card-title"><span>🗺️</span> Localização no Mapa</div>
-          <div id="map"></div>
+          <div id="map">
+            <div class="map-ui map-chips">
+              <span class="map-chip active" data-layer="hibrido" onclick="mapSetLayer('hibrido')">Híbrido</span>
+              <span class="map-chip" data-layer="satelite" onclick="mapSetLayer('satelite')">Satélite</span>
+              <span class="map-chip" data-layer="ruas" onclick="mapSetLayer('ruas')">Ruas</span>
+              <span class="map-chip" data-layer="topo" onclick="mapSetLayer('topo')">Topográfico</span>
+            </div>
+            <div class="map-ui map-tools">
+              <button class="map-btn" title="Aproximar" onclick="mapZoom(0.5)">+</button>
+              <button class="map-btn" title="Afastar" onclick="mapZoom(2)">−</button>
+              <button class="map-btn" title="Ver o Brasil" onclick="mapHomeBrasil()">🏠</button>
+              <button class="map-btn" title="Ir ao terreno" onclick="mapIrAoTerreno()">🎯</button>
+            </div>
+            <div class="map-ui" id="mapCoords">—</div>
+          </div>
           <p style="font-size:11px;color:var(--text2);margin-top:8px;">
             Clique no mapa para definir coordenadas precisas, ou informe o endereço acima.
           </p>
@@ -546,10 +573,65 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuth();
 });
 
-function initMap() {
-  // Para terreno 3D real: registre-se grátis em ion.cesium.com e cole o token abaixo
-  // Cesium.Ion.defaultAccessToken = 'SEU_TOKEN_AQUI';
+// ── MAPA (Cesium) ─────────────────────────────────────────────────────────
+// Camadas base estilo Avenza/Google Earth. NOTA: desde o Cesium 1.107 a opcao
+// `imageryProvider` do Viewer foi removida — era por isso que o mapa renderizava
+// preto (globo sem imagem nenhuma). O caminho atual e `baseLayer`/imageryLayers.
+const _MAP_SOURCES = {
+  satelite: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    credit: '© Esri, Maxar, Earthstar Geographics', maximumLevel: 19 }),
+  labels: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    credit: '© Esri', maximumLevel: 19 }),
+  ruas: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    credit: '© OpenStreetMap contributors', maximumLevel: 19 }),
+  topo: () => new Cesium.UrlTemplateImageryProvider({
+    url: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+    credit: '© OpenTopoMap (CC-BY-SA) / OSM', maximumLevel: 17 }),
+};
 
+function mapSetLayer(mode) {
+  if (!map) return;
+  map.imageryLayers.removeAll();
+  if (mode === 'hibrido') {
+    map.imageryLayers.addImageryProvider(_MAP_SOURCES.satelite());
+    map.imageryLayers.addImageryProvider(_MAP_SOURCES.labels());
+  } else {
+    map.imageryLayers.addImageryProvider(_MAP_SOURCES[mode]());
+  }
+  document.querySelectorAll('.map-chip').forEach(el =>
+    el.classList.toggle('active', el.dataset.layer === mode));
+}
+
+function mapZoom(fator) {
+  if (!map) return;
+  const h = map.camera.positionCartographic.height;
+  if (fator < 1) map.camera.zoomIn(h * 0.5); else map.camera.zoomOut(h);
+}
+
+function mapHomeBrasil() {
+  if (!map) return;
+  map.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(-52.0, -14.0, 5500000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
+    duration: 1.2,
+  });
+}
+
+function mapIrAoTerreno() {
+  const lat = parseFloat(document.getElementById('terrainLat').value);
+  const lon = parseFloat(document.getElementById('terrainLon').value);
+  if (isNaN(lat) || isNaN(lon)) { alert('Preencha latitude/longitude (ou clique no mapa) primeiro'); return; }
+  map.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(lon, lat, 2500),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 },
+    duration: 1.6,
+  });
+}
+
+function initMap() {
   map = new Cesium.Viewer('map', {
     baseLayerPicker: false,
     geocoder: false,
@@ -561,25 +643,24 @@ function initMap() {
     fullscreenButton: false,
     infoBox: false,
     selectionIndicator: false,
-    imageryProvider: new Cesium.UrlTemplateImageryProvider({
-      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      credit: '© Esri, Maxar, Earthstar Geographics'
-    }),
-    terrainProvider: new Cesium.EllipsoidTerrainProvider()
+    baseLayer: new Cesium.ImageryLayer(_MAP_SOURCES.satelite()),
+    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
   });
+  map.imageryLayers.addImageryProvider(_MAP_SOURCES.labels());  // hibrido por padrao
+  map.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0d1b2a');
+  map.scene.screenSpaceCameraController.minimumZoomDistance = 120;
 
-  // Esconde créditos padrão do Cesium
   try { map.cesiumWidget.creditContainer.style.display = 'none'; } catch(e) {}
 
-  // Posição inicial — Brasil centro
-  map.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(-44.5, -22.5, 800000),
-    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 },
-    duration: 0
+  // Posicao inicial — Brasil visto de cima
+  map.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(-52.0, -14.0, 5500000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
   });
 
-  // Clique para capturar coordenadas
   const handler = new Cesium.ScreenSpaceEventHandler(map.scene.canvas);
+
+  // Clique define as coordenadas do formulario
   handler.setInputAction(function(click) {
     const cartesian = map.camera.pickEllipsoid(click.position, map.scene.globe.ellipsoid);
     if (!cartesian) return;
@@ -590,6 +671,16 @@ function initMap() {
     document.getElementById('terrainLon').value = lng.toFixed(6);
     _placeMapMarker(lat, lng, null, null);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  // Coordenadas sob o cursor (estilo Avenza)
+  const coordEl = document.getElementById('mapCoords');
+  handler.setInputAction(function(move) {
+    const cartesian = map.camera.pickEllipsoid(move.endPosition, map.scene.globe.ellipsoid);
+    if (!cartesian || !coordEl) return;
+    const carto = Cesium.Cartographic.fromCartesian(cartesian);
+    coordEl.textContent = Cesium.Math.toDegrees(carto.latitude).toFixed(5) + ', ' +
+                          Cesium.Math.toDegrees(carto.longitude).toFixed(5);
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 }
 
 // ── PROJECTS ─────────────────────────────────────────────────────────────
@@ -1257,7 +1348,7 @@ function init3D() {
   camera3D.lookAt(0, 0, 0);
 
   renderer3D = new THREE.WebGLRenderer({canvas, antialias: true});
-nderer3D.setSize(canvas.clientWidth, canvas.clientHeight);
+  renderer3D.setSize(canvas.clientWidth, canvas.clientHeight);
   renderer3D.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   // Iluminação
