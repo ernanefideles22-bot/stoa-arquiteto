@@ -13,7 +13,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .models.database import create_tables
-from .routers import projects, terrain, implantation, financial, report
+from fastapi import Depends
+from .routers import projects, terrain, implantation, financial, report, lens
+from .services.auth import require_user
 
 # Criar tabelas na inicialização (tolerante a falhas de conexão em serverless)
 try:
@@ -41,12 +43,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
-app.include_router(projects.router)
-app.include_router(terrain.router)
-app.include_router(implantation.router)
-app.include_router(financial.router)
-app.include_router(report.router)
+# Routers — todos exigem login (Supabase Auth, ver services/auth.py).
+# Desligavel com AUTH_ENABLED=false. /health e / continuam publicos.
+_protegido = [Depends(require_user)]
+app.include_router(projects.router, dependencies=_protegido)
+app.include_router(terrain.router, dependencies=_protegido)
+app.include_router(implantation.router, dependencies=_protegido)
+app.include_router(financial.router, dependencies=_protegido)
+app.include_router(report.router, dependencies=_protegido)
+app.include_router(lens.router, dependencies=_protegido)
 
 # Servir frontend
 # Fonte unica de verdade: public/ (mesmo arquivo servido em producao pela Vercel,
