@@ -134,6 +134,7 @@ class Implantation(Base):
     layout_svg = Column(Text)
     layout_3d = Column(JSON)
     lotes = Column(JSON)
+    geometria = Column(JSON)  # parcelamento calculado (parcel_engine): vias/lotes/verdes/stats
     vias = Column(JSON)
     areas_comuns = Column(JSON)
     justificativa = Column(Text)
