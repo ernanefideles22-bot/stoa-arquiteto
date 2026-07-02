@@ -7,7 +7,7 @@ import traceback
 import os
 
 from ..models.database import (get_db, engine, Project, Terrain, Topography,
-                               Implantation, Architecture, Urbanism, Financial, Report)
+                               Implantation, Financial, Report)
 from ..services.errors import error_detail
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -101,8 +101,7 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
         # As FKs no banco de producao nao tem ON DELETE CASCADE, entao deletar
         # o projeto direto estoura IntegrityError (e o 500 que impedia qualquer
         # exclusao de projeto com dados). Remove os filhos explicitamente antes.
-        for model in (Report, Financial, Architecture, Urbanism, Implantation,
-                      Topography, Terrain):
+        for model in (Report, Financial, Implantation, Topography, Terrain):
             db.query(model).filter(model.project_id == project_id).delete(
                 synchronize_session=False)
         db.delete(p)
@@ -128,7 +127,7 @@ def _serialize_full(p: Project) -> dict:
     d["has_terrain"]      = p.terrain is not None
     d["has_topography"]   = p.topography is not None
     d["has_implantation"] = len(p.implantations) > 0
-    d["has_architecture"] = p.architecture is not None
     d["has_financial"]    = p.financial is not None
+    d["has_implantation_selected"] = any(i.is_selected for i in p.implantations)
     d["implantations_count"] = len(p.implantations)
     return d
