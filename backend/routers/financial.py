@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 
-from ..models.database import get_db, Project, Terrain, Topography, Implantation, Architecture, Financial
+from ..models.database import get_db, Project, Terrain, Topography, Implantation, Financial
 from ..services import ai_engine, chart_service
 
 router = APIRouter(prefix="/api/financial", tags=["financial"])
@@ -37,8 +37,6 @@ async def analyze_financial(data: FinancialRequest, db: Session = Depends(get_db
     if not imp:
         raise HTTPException(400, "Gere e selecione uma implantação antes da análise financeira")
 
-    arch = db.query(Architecture).filter(Architecture.project_id == data.project_id).first()
-
     terrain_ctx = {
         "city": terrain.city if terrain else "",
         "state": terrain.state if terrain else "",
@@ -53,12 +51,9 @@ async def analyze_financial(data: FinancialRequest, db: Session = Depends(get_db
         "area_vias_m2": imp.area_vias,
         "custo_estimado_infraestrutura": "",
     }
+    # Modulo de arquitetura foi removido (tabela nunca era populada);
+    # o contexto arquitetonico vazio mantem a assinatura do ai_engine.
     arch_ctx = {}
-    if arch:
-        arch_ctx = {
-            "sistema_estrutural": arch.memorial or "",
-            "estimativa_custo_m2": "",
-        }
 
     result = await ai_engine.calcular_viabilidade(terrain_ctx, imp_ctx, arch_ctx, data.cenario)
 
