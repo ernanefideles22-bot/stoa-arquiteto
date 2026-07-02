@@ -62,8 +62,6 @@ class Project(Base):
     terrain = relationship("Terrain", back_populates="project", uselist=False)
     topography = relationship("Topography", back_populates="project", uselist=False)
     implantations = relationship("Implantation", back_populates="project")
-    architecture = relationship("Architecture", back_populates="project", uselist=False)
-    urbanism = relationship("Urbanism", back_populates="project", uselist=False)
     financial = relationship("Financial", back_populates="project", uselist=False)
     reports = relationship("Report", back_populates="project")
 
@@ -145,37 +143,7 @@ class Implantation(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     project = relationship("Project", back_populates="implantations")
 
-class Architecture(Base):
-    __tablename__ = "architectures"
-    id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-    estilo = Column(String)
-    area_unidade = Column(Float)
-    pavimentos = Column(Integer)
-    programa = Column(JSON)
-    planta_svg = Column(Text)
-    fachada_svg = Column(Text)
-    dados_3d = Column(JSON)
-    memorial = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    project = relationship("Project", back_populates="architecture")
 
-class Urbanism(Base):
-    __tablename__ = "urbanisms"
-    id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-    taxa_ocupacao = Column(Float)
-    coef_aproveitamento = Column(Float)
-    area_permeavel = Column(Float)
-    recuo_frontal = Column(Float)
-    recuo_lateral = Column(Float)
-    recuo_fundos = Column(Float)
-    gabarito_max = Column(Float)
-    conformidade = Column(JSON)
-    restricoes_legais = Column(JSON)
-    analise_ia = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    project = relationship("Project", back_populates="urbanism")
 
 class Financial(Base):
     __tablename__ = "financials"
