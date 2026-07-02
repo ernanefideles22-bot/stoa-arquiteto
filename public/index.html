@@ -199,6 +199,11 @@ textarea{resize:vertical;min-height:72px;}
 .lens-inline summary { cursor:pointer; font-weight:600; padding:4px 0; list-style:none; }
 .lens-inline summary::before { content:'▸ '; }
 .lens-inline[open] summary::before { content:'▾ '; }
+
+#parcelResults .kpi { background:rgba(255,255,255,.04); border:1px solid var(--border,rgba(255,255,255,.1));
+  border-radius:10px; padding:10px 16px; display:flex; flex-direction:column; }
+#parcelResults .kpi strong { font-size:18px; color:var(--accent,#4fc3f7); }
+#parcelResults .kpi span { font-size:11px; color:var(--text2,#8b93b0); }
 </style>
 </head>
 <body>
@@ -478,6 +483,16 @@ textarea{resize:vertical;min-height:72px;}
           </button>
         </div>
         <div id="implantationResults"></div>
+
+        <div class="card" id="parcelCard" style="margin-top:16px">
+          <div class="card-title"><span>📐</span> Projeto de Implantação (prancha técnica)</div>
+          <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
+            Gera o desenho do parcelamento usando a topografia real: vias acompanham as curvas
+            de nível, encostas acima de 30% viram área verde, lotes numerados com área e cota.
+          </p>
+          <button class="btn btn-primary" id="btnParcel" onclick="gerarPrancha()">📐 Gerar projeto com a topografia</button>
+          <div id="parcelResults" style="margin-top:14px"></div>
+        </div>
       </div>
 
       <!-- FINANCEIRO -->
@@ -1490,8 +1505,39 @@ async function load3DTerrain() {
         const ir = await fetch(`${API}/api/implantation/${currentProject.id}`);
         if (ir.ok) {
           const alts = await ir.json();
-          const sel = alts.find(a => a.selected) || alts[0];
-          if (sel && sel.num_lotes) {
+          const sel = alts.find(a => a.is_selected) || alts.find(a => a.selected) || alts[0];
+          const geom = sel && sel.geometria;
+          if (geom && geom.lotes && geom.lotes.length) {
+            // Geometria REAL do parcel_engine: coords locais [0,L] mapeadas ao
+            // plano 3D de 40un (o grid de elevacao cobre 2.8x o lado do terreno,
+            // com o terreno no miolo — mesma convencao do backend).
+            const L = geom.L, S = 2.8 * L, off = (S - L) / 2;
+            const toPlane = v => ((off + v) / S) * 40 - 20;
+            const scl = 40 / S;
+            const elevAt = (x, y) => {
+              const gx = Math.round(((off + x) / S) * (n - 1));
+              const gy = Math.round(((off + y) / S) * (n - 1));
+              return ((flat[Math.min(gy * n + gx, flat.length - 1)] - minE) / range) * 10;
+            };
+            for (const l of geom.lotes.slice(0, 200)) {
+              const cx = l.x + l.w / 2, cy = l.y + l.h / 2;
+              const lg = new THREE.BoxGeometry(l.w * scl * 0.9, 0.5, l.h * scl * 0.9);
+              const lm = new THREE.MeshLambertMaterial({ color: 0x4fc3f7, transparent: true, opacity: 0.85 });
+              const lot = new THREE.Mesh(lg, lm);
+              lot.name = 'lot';
+              lot.position.set(toPlane(cx), elevAt(cx, cy) + 0.3, -(toPlane(cy)));
+              scene3D.add(lot);
+            }
+            for (const v of (geom.verdes || []).slice(0, 100)) {
+              const cx = v.x + v.w / 2, cy = v.y + v.h / 2;
+              const vg = new THREE.BoxGeometry(v.w * scl * 0.92, 0.25, v.h * scl * 0.92);
+              const vm = new THREE.MeshLambertMaterial({ color: 0x66bb6a, transparent: true, opacity: 0.7 });
+              const verde = new THREE.Mesh(vg, vm);
+              verde.name = 'lot';
+              verde.position.set(toPlane(cx), elevAt(cx, cy) + 0.15, -(toPlane(cy)));
+              scene3D.add(verde);
+            }
+          } else if (sel && sel.num_lotes) {
             const cols = Math.ceil(Math.sqrt(sel.num_lotes));
             const count = Math.min(sel.num_lotes, 60);
             for (let i = 0; i < count; i++) {
@@ -1756,6 +1802,45 @@ function lensApply() {
   if (c.zoning_notes) notes.value = (notes.value ? notes.value + '\n' : '') + '[Lens] ' + c.zoning_notes;
   document.getElementById('lensDetails').open = false;
   document.getElementById('terrainAddress').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+
+// ═══ PROJETO GEOMETRICO / PRANCHA ══════════════════════════════════════════
+async function gerarPrancha() {
+  if (!currentProject) { alert('Selecione um projeto'); return; }
+  const btn = document.getElementById('btnParcel');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '⏳ Calculando geometria...';
+  try {
+    const res = await fetch(`${API}/api/implantation/parcel`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ project_id: currentProject.id })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail?.error || data.detail || 'Falha ao gerar projeto');
+    renderPrancha(data);
+  } catch (e) { alert('Erro: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+function renderPrancha(data) {
+  const s = data.stats;
+  const svgB64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(data.prancha_svg)));
+  const fm = v => (v || 0).toLocaleString('pt-BR', {maximumFractionDigits: 0});
+  document.getElementById('parcelResults').innerHTML = `
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+      <div class="kpi"><strong>${s.num_lotes}</strong><span>lotes</span></div>
+      <div class="kpi"><strong>${fm(s.area_lotes_m2)} m²</strong><span>em lotes (${s.aproveitamento_pct}%)</span></div>
+      <div class="kpi"><strong>${fm(s.area_vias_m2)} m²</strong><span>vias</span></div>
+      <div class="kpi"><strong>${fm(s.area_verde_m2)} m²</strong><span>verde/preservação</span></div>
+    </div>
+    <img src="${svgB64}" alt="Prancha de implantação" style="width:100%;border-radius:10px;border:1px solid var(--border);background:#fff">
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <a class="btn btn-outline" download="prancha-${(currentProject.name||'projeto').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.svg" href="${svgB64}">⬇ Baixar prancha (SVG)</a>
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-top:8px">Estudo preliminar gerado por algoritmo sobre dados SRTM 30m — sujeito a levantamento topográfico e aprovação por profissional habilitado.</p>`;
 }
 
 </script>
