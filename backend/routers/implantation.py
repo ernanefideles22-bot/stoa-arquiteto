@@ -5,7 +5,9 @@ from typing import Optional, List
 import math
 
 from ..models.database import get_db, Project, Terrain, Topography, Implantation
-from ..services import ai_engine
+from ..services import ai_engine, parcel_engine, prancha_service
+from ..services.errors import error_detail
+import json as _json
 
 router = APIRouter(prefix="/api/implantation", tags=["implantation"])
 
@@ -141,3 +143,67 @@ def get_implantations(project_id: int, db: Session = Depends(get_db)):
         {k: v for k, v in i.__dict__.items() if not k.startswith("_")}
         for i in imps
     ]
+
+
+class ParcelRequest(BaseModel):
+    project_id: int
+
+
+def _montar_parcel(db: Session, project_id: int):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(404, "Projeto nao encontrado")
+    terrain = db.query(Terrain).filter(Terrain.project_id == project_id).first()
+    topo = db.query(Topography).filter(Topography.project_id == project_id).first()
+    imp = db.query(Implantation).filter(
+        Implantation.project_id == project_id, Implantation.is_selected == True).first()
+    if not (terrain and terrain.area_ha):
+        raise HTTPException(400, "Cadastre o terreno (etapa 1) antes de gerar o projeto")
+    if not (topo and topo.elevation_grid):
+        raise HTTPException(400, "Rode a analise topografica (etapa 2) antes de gerar o projeto")
+    if not imp:
+        raise HTTPException(400, "Selecione uma implantacao (etapa 3) antes de gerar o projeto")
+    grid = topo.elevation_grid
+    if isinstance(grid, str):
+        grid = _json.loads(grid)
+    return project, terrain, imp, grid
+
+
+@router.post("/parcel")
+def gerar_parcel(data: ParcelRequest, db: Session = Depends(get_db)):
+    """
+    Gera o PROJETO GEOMETRICO do parcelamento (vias, quadras, lotes, verdes)
+    usando a topografia real do terreno, salva na implantacao selecionada e
+    devolve a prancha tecnica em SVG. Deterministico — pode regenerar a vontade.
+    """
+    project, terrain, imp, grid = _montar_parcel(db, data.project_id)
+    media = imp.area_media_lote or 650.0
+    try:
+        geometria = parcel_engine.gerar_parcelamento(
+            area_m2=terrain.area_ha * 10_000,
+            elevation_grid=grid,
+            num_lotes_alvo=imp.num_lotes or 40,
+            area_min_lote=max(200.0, media * 0.7),
+            area_max_lote=media * 1.5,
+        )
+        imp.geometria = geometria
+        db.commit()
+        svg = prancha_service.gerar_prancha_svg(
+            geometria, project.name, f"{terrain.city or ''}/{terrain.state or ''}".strip("/"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=error_detail(e, "parcel"))
+    return {"geometria": geometria, "prancha_svg": svg, "stats": geometria["stats"],
+            "implantacao": imp.nome}
+
+
+@router.get("/parcel/{project_id}")
+def obter_parcel(project_id: int, db: Session = Depends(get_db)):
+    project, terrain, imp, _ = _montar_parcel(db, project_id)
+    if not imp.geometria:
+        raise HTTPException(404, "Projeto geometrico ainda nao gerado")
+    svg = prancha_service.gerar_prancha_svg(
+        imp.geometria, project.name, f"{terrain.city or ''}/{terrain.state or ''}".strip("/"))
+    return {"geometria": imp.geometria, "prancha_svg": svg, "stats": imp.geometria.get("stats", {})}
